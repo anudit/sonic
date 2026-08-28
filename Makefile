@@ -1,4 +1,4 @@
-.PHONY: demo-data p3-layer p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
+.PHONY: demo-data p3-layer p3-generate p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
 
 # Homebrew's binutils shadows Apple's ar with GNU ar, whose archives macOS ld
 # rejects. Verilator links fail without this.
@@ -223,3 +223,7 @@ p3-layer: p2/vectors/layer_l5.bin build/sonic_golden.o
 demo-data:
 	@python3 demo/build.py
 	@echo "demo/floorplan.html updated"
+
+# --- P3: text in, text out under the chip's weight formats
+p3-generate:
+	@.venv/bin/python p3/generate.py --tokens $(or $(TOKENS),48)
