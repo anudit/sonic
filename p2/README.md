@@ -11,10 +11,10 @@ first commit.
 | P2-1 | Hierarchical accumulator | `rtl/sonic_acc.sv` | **done, verified** |
 | P2-2 | Dual-mode PE with banked accumulators | `rtl/sonic_pe.sv` | **done, verified** |
 | P2-6 | MoE top-k router | `rtl/sonic_router.sv` | **done, verified vs the 8.47B model** |
-| P2-3 | Differential bench vs. the golden model | `tb/tb_*.cpp` | 6 of 9 units |
+| P2-3 | Differential bench vs. the golden model | `tb/tb_*.cpp` | 8 of 9 units |
 | P2-4 | Automated PPA loop | `ppa/loop.py` | done |
 | P2-5a | 64x64 dual-mode systolic sub-tile | `rtl/sonic_tile.sv` | **done, verified** |
-| P2-5b | Weight streamer + expert gather | `rtl/sonic_streamer.sv` | done, unverified |
+| P2-5b | Weight streamer + expert gather | `rtl/sonic_streamer.sv` | **done, verified** |
 | P2-5c | Short-conv unit (k<=7, double-gated) | `rtl/sonic_conv.sv` | **done, verified — bug found** |
 | P2-5d | Online-softmax attention accumulator | `rtl/sonic_softmax.sv` | **done, verified — two bugs found** |
 | P2-5e | Streaming LM head + top-K | `rtl/sonic_lmhead.sv` | **done, verified** |
@@ -354,6 +354,32 @@ That gap is the minimax-centring this repo already records as a finding for the
 router; `sonic_pwl_fit_silu` does not appear to get the same treatment.
 
 Both changes are free: `quant.SILU` marks the coefficients firmware-loadable.
+
+## Finding 21: the streamer's scale/group_done contract
+
+54 checks, no failures. Pass-through latency, hold-through-stall, the beat
+counter refusing to advance on a stall, `group_done` landing on a group's last
+beat, and expert latching independent of the weight stream all hold.
+
+One behaviour is pinned rather than judged. A scale loaded in the **same cycle**
+as a group's final beat lands on that group's `group_done`, so `scale_out`
+carries the *next* group's scale:
+
+```
+scale loaded on the final beat -> scale_out = 1792 at group_done
+   (256 is this group's scale, 1792 is the next one's)
+```
+
+Whether that is a bug depends on the producer's contract, which does not exist
+yet, so the bench records it instead of asserting either way. It matters because
+scales are applied to the **accumulated partial sum** — one misaligned scale
+mis-scales all 64 weights in a group at once, and the result stays plausible.
+Whoever writes the descriptor-ring sequencer (P3-3) has to guarantee the scale
+is loaded at least one cycle before the final beat.
+
+Also worth reconciling: the port comment says the scale is "FP16-as-Q16", but the
+reset value is `16'sh0100` = 256, which is 1.0 only in Q8.8. A 16-bit Q16 cannot
+represent 1.0 at all. One of the two is wrong.
 
 ## Caveats
 

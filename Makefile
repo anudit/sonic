@@ -66,6 +66,12 @@ p2-units: build/sonic_golden.o
 	  $(MAKE) -C build/obj_$$u -f Vsonic_$$u.mk $(AR_FIX) -j8 >/dev/null 2>&1; \
 	  printf "  sonic_%-8s " "$$u"; ./build/obj_$$u/Vsonic_$$u | tail -1; \
 	done
+	@rm -rf build/obj_streamer
+	@verilator --cc --exe -O2 -Wno-fatal -Ip2/rtl -CFLAGS "-O2" \
+	  --Mdir build/obj_streamer --top-module sonic_streamer -GLANES=16 -GGROUP=64 \
+	  p2/rtl/sonic_streamer.sv p2/tb/tb_streamer.cpp >/dev/null 2>&1
+	@$(MAKE) -C build/obj_streamer -f Vsonic_streamer.mk $(AR_FIX) -j8 >/dev/null 2>&1
+	@printf "  sonic_streamer "; ./build/obj_streamer/Vsonic_streamer | tail -1
 	@for u in tile lmhead; do \
 	  rm -rf build/obj_$$u; \
 	  verilator --cc --exe -O2 -Wall -Wno-DECLFILENAME -Ip2/rtl \
