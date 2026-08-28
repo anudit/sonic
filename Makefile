@@ -1,4 +1,4 @@
-.PHONY: p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
+.PHONY: p3-layer p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
 
 # Homebrew's binutils shadows Apple's ar with GNU ar, whose archives macOS ld
 # rejects. Verilator links fail without this.
@@ -205,3 +205,16 @@ p2-conv:
 	  p2/rtl/sonic_conv.sv p2/tb/tb_conv.cpp >/dev/null 2>&1
 	@$(MAKE) -C build/obj_conv -f Vsonic_conv.mk $(AR_FIX) -j8 >/dev/null 2>&1
 	@./build/obj_conv/Vsonic_conv
+
+# --- P3-5: one MoE layer end to end, RTL against the real model
+p2/vectors/layer_l5.bin:
+	@.venv/bin/python p3/export_layer.py --layer 5 --tokens 1
+
+p3-layer: p2/vectors/layer_l5.bin build/sonic_golden.o
+	@rm -rf build/obj_layer
+	@verilator --cc --exe -O2 -Wno-fatal -Ip2/rtl \
+	  -CFLAGS "-I$(CURDIR)/p0/golden -O2" --Mdir build/obj_layer \
+	  --top-module sonic_tile p2/rtl/sonic_acc.sv p2/rtl/sonic_pe.sv \
+	  p2/rtl/sonic_tile.sv p2/tb/tb_layer.cpp $(CURDIR)/build/sonic_golden.o >/dev/null 2>&1
+	@$(MAKE) -C build/obj_layer -f Vsonic_tile.mk $(AR_FIX) -j8 >/dev/null 2>&1
+	@./build/obj_layer/Vsonic_tile p2/vectors/layer_l5.bin $(or $(ROWS),256)

@@ -14,3 +14,4 @@ p4/out/
 # Third-party checkout, not vendored: p1/dram.py expects it at dramsim3/
 # and the Makefile builds it. See p1/README.md.
 dramsim3/
+p2/vectors/layer_l5.bin
