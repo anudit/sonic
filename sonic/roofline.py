@@ -86,6 +86,33 @@ def prefill(model: ModelSpec, chip: ChipSpec, seq: int,
                    chunks=chunks, mb_per_token=chunks * sweep / seq)
 
 
+# Measured from p2/rtl/sonic_tile.sv, synthesized standalone with
+# Yosys + `abc -g cmos2` at T = 4, 8, 16:
+#
+#     cells(T) = 712.0*T^2 + 2158.9*T - 1514.3
+#
+# Fitted on those three edges and validated at T = 12, where it predicts within
+# 1.5%. The T^2 term is the PE array proper. The linear and constant terms are
+# the per-tile overhead P1's sweep was getting for free: the accumulator column,
+# per-tile control, and partial-sum egress. Because a tile of edge T holds T^2
+# lanes, that overhead is amortised over fewer lanes as tiles shrink, so cost
+# per lane rises as 1/T -- which is exactly the term that was missing.
+TILE_FIT = (712.0, 2158.9, -1514.3)
+TILE_REF = 128          # anchor: the ChipSpec default, so published area is unchanged
+
+
+def tile_area_factor(tile: int, ref: int = TILE_REF) -> float:
+    """Array area per lane at `tile`, relative to a monolithic `ref` edge.
+
+    1.0 at the reference edge by construction, so adopting this model moves no
+    previously published number; it only prices the sub-tiling that P1-1's sweep
+    could previously buy for nothing.
+    """
+    a, b, c = TILE_FIT
+    per_lane = lambda t: a + b / t + c / (t * t)   # noqa: E731
+    return per_lane(tile) / per_lane(ref)
+
+
 def area(chip: ChipSpec) -> dict[str, float]:
     """Die area by block, mm2. Returns blocks plus '_routing' and '_total'."""
     blocks = dict(AREA_FIXED)
@@ -93,7 +120,7 @@ def area(chip: ChipSpec) -> dict[str, float]:
     blocks[f"{chip.sram_mb:.0f} MB SRAM, {chip.sram_banks} banks"] = (
         chip.sram_mb * chip.sram_mm2_per_mb)
     blocks[f"{chip.mac_lanes:,}-lane dual-mode array"] = (
-        chip.mac_lanes * chip.mac_mm2_per_lane)
+        chip.mac_lanes * chip.mac_mm2_per_lane * tile_area_factor(chip.tile))
 
     core = sum(blocks.values())
     total = core * 1.09  # routing / utilisation overhead at 65% target density

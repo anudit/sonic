@@ -64,9 +64,48 @@ as the recommendation and 16 × 32² as a direction to model properly — the sw
 currently rewards arbitrarily small tiles, which is a sign the cost model is
 incomplete, not that 8 × 8 tiles are optimal.
 
+## Sub-tiling is now priced, and it does not change the answer
+
+`roofline.area` charged a flat cost per lane, so `tile` did not appear in it at
+all — the sweep saw sub-tiling's occupancy benefit in full and none of its cost.
+That is a one-sided incentive, not a missing coefficient, which is why the sweep
+rewarded arbitrarily small tiles.
+
+The cost is now measured rather than asserted. `p2/rtl/sonic_tile.sv`
+synthesized standalone at T = 4, 8, 16 with Yosys + `abc -g cmos2`:
+
+```
+cells(T) = 712.0*T^2 + 2158.9*T - 1514.3        validated at T=12, within 1.5%
+```
+
+The `T^2` term is the PE array; the linear and constant terms are the per-tile
+overhead — accumulator column, control, partial-sum egress — amortised over
+fewer lanes as tiles shrink. Array area per lane, against a monolithic 128 edge:
+
+| sub-tile edge | 128 | 64 | 32 | 16 |
+|---|---:|---:|---:|---:|
+| array area factor | 1.000 | 1.023 | 1.068 | 1.154 |
+| die, 16,384 lanes | 20.56 | 20.70 | 20.98 | 21.52 mm² |
+
+**The charge is real and it is small.** Going 128 -> 32 costs 6.8% of array area
+and about 2% of the die, against an occupancy gain of 0.805 -> 0.942. The sweep
+still selects **16 x 32²**, unchanged.
+
+So the open item is closed with a negative result: **area was not the missing
+cost.** Either small tiles genuinely are better and 4 x 64² was conservative, or
+the real penalty is bandwidth — weight reuse per tile and cross-tile partial-sum
+traffic — which is not an area term and will not be found by refining one. That
+is the next thing to model, and it is now the only remaining reason to doubt
+16 x 32².
+
+The reference edge is anchored at 128 so adopting this moves no published
+figure: the S1 default still reports 20.56 mm².
+
 ## Open items
 
-1. **Charge for sub-tiling** in `sonic/roofline.area` before trusting P1-1.
+1. ~~Charge for sub-tiling in `sonic/roofline.area`~~ — **done, above.** It costs
+   ~2% of die and does not change the recommendation. Model the *bandwidth* cost
+   of sub-tiling instead: that is where the penalty must be, if there is one.
 2. **Hook up a real DRAM timing model** (DRAMsim3). `dram_eff` is currently a
    flat 1.0 in `chipspec.py` with 0.85 as the gate; the expert-gather access
    pattern is exactly the case where a flat derate is least trustworthy.

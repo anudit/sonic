@@ -222,3 +222,28 @@ def test_not_bump_limited():
     """614 bumps at 110 um fine-pitch C4 need >= 9.9 mm2; the die is 20.6."""
     bumps, pitch_mm, usable = 614, 0.110, 0.75
     assert bumps * pitch_mm ** 2 / usable < area(SKUS["B"])["_total"]
+
+
+# --- sub-tiling area, measured from sonic_tile.sv ------------------------------
+
+def test_tile_area_factor_anchored_and_monotone():
+    """Smaller sub-tiles must cost more array area per lane, and the reference
+    edge must be free -- otherwise adopting the model silently moves the
+    published 20.6 mm2 die figure."""
+    from sonic.roofline import tile_area_factor, TILE_REF
+    assert tile_area_factor(TILE_REF) == 1.0
+    f = [tile_area_factor(t) for t in (128, 64, 32, 16)]
+    assert f == sorted(f), "area per lane must rise as tiles shrink"
+    close(tile_area_factor(32), 1.0675)
+
+
+def test_sub_tiling_is_priced_but_does_not_dominate():
+    """The measured charge is ~2% of die at tile 32. Recorded because it is the
+    answer to P1-1's open item: area was NOT the missing cost, so if 16 x 32^2
+    is wrong the reason is bandwidth, not area."""
+    from dataclasses import replace
+    from sonic.roofline import area
+    from sonic.chipspec import S1
+    big = area(replace(S1, tile=128))["_total"]
+    small = area(replace(S1, tile=32))["_total"]
+    assert 1.0 < small / big < 1.05, f"tile-32 die penalty {small/big:.3f}"
