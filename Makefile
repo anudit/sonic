@@ -1,4 +1,4 @@
-.PHONY: all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
+.PHONY: p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
 
 # Homebrew's binutils shadows Apple's ar with GNU ar, whose archives macOS ld
 # rejects. Verilator links fail without this.
@@ -195,3 +195,13 @@ p1-dram: $(DRAM_SIM)
 	     -o $(CURDIR)/$(DRAM_OUT)/out_$$p -c $(DRAM_CYC) >/dev/null 2>&1); \
 	done
 	@python3 p1/dram.py
+
+# sonic_conv's bench currently FAILS on a real RTL bug (p2/README finding 19),
+# so it is not in p2-units. Run it deliberately.
+p2-conv:
+	@rm -rf build/obj_conv
+	@verilator --cc --exe -O2 -Wno-fatal -Ip2/rtl -CFLAGS "-O2" \
+	  --Mdir build/obj_conv --top-module sonic_conv -GCH=4 \
+	  p2/rtl/sonic_conv.sv p2/tb/tb_conv.cpp >/dev/null 2>&1
+	@$(MAKE) -C build/obj_conv -f Vsonic_conv.mk $(AR_FIX) -j8 >/dev/null 2>&1
+	@./build/obj_conv/Vsonic_conv || true

@@ -15,7 +15,7 @@ first commit.
 | P2-4 | Automated PPA loop | `ppa/loop.py` | done |
 | P2-5a | 64x64 dual-mode systolic sub-tile | `rtl/sonic_tile.sv` | **done, verified** |
 | P2-5b | Weight streamer + expert gather | `rtl/sonic_streamer.sv` | done, unverified |
-| P2-5c | Short-conv unit (k<=7, double-gated) | `rtl/sonic_conv.sv` | done, unverified |
+| P2-5c | Short-conv unit (k<=7, double-gated) | `rtl/sonic_conv.sv` | **benched — FAILS, see finding 19** |
 | P2-5d | Online-softmax attention accumulator | `rtl/sonic_softmax.sv` | **done, verified — two bugs found** |
 | P2-5e | Streaming LM head + top-K | `rtl/sonic_lmhead.sv` | **done, verified** |
 | P2-5f | Descriptor-ring sequencer | `rtl/sonic_seq.sv` | done, unverified |
@@ -272,6 +272,37 @@ C model; it is now proved in the RTL as well.
 One design question is pinned rather than answered: `ovf` is `|bank_ovf`, so an
 overflow in any bank raises it on every read. Nothing here overflows, so the
 bench records the scope rather than exercising it.
+
+## Finding 19: `sonic_conv` disagrees with its own requantization spec
+
+`make p2-conv`. The bench fails 241 of 554 checks, and the failure reproduces in
+isolation. History engaged, `k_taps = 3`, kernel `[2, -2, 0...]`:
+
+| x(0) | x(1) | c | sum | sum*c | spec `>>>14` | RTL |
+|---:|---:|---:|---:|---:|---:|---:|
+| +10 | +23 | +25 | +26 | 650 | 0 | **4** |
+| -10 | -23 | -25 | -26 | 650 | 0 | **5** |
+
+Two separate things are wrong. The magnitude disagrees with the documented
+requantization by far more than rounding. And **the result is not
+sign-symmetric**: identical operand magnitudes producing an identical product
+give 4 and 5.
+
+It is not a bench artifact. With an empty history (`n = 0`) the block is
+correct, and each tap exercised alone is correct — `tap0` only, `tap1` only, and
+a zero kernel all match. The fault appears only once a history tap and the
+output gate are both active.
+
+**I have not identified the mechanism, so the RTL is unchanged.** Patching
+arithmetic that is wrong in a way I cannot explain would risk making the bench
+pass while leaving the design wrong. The bench is therefore committed failing
+and kept out of `make p2-units`, so the build stays green while the bug stays
+visible.
+
+Also pinned by the same bench, and a separate issue: `y_out` is combinational
+from `x_in` while `out_vld` is registered, so when `out_vld` is high `y_out`
+already reflects the *next* sample. Consumers must sample `y_out` with
+`in_vld`. That is a contract worth stating either way.
 
 ## Caveats
 
