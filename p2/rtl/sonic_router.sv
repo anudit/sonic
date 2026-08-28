@@ -158,6 +158,40 @@ module sonic_router #(
   // --- top-K selection ---------------------------------------------------
   // Sequential max-extract: K passes over E scores. K and E are both small, so
   // this costs K*E comparators once rather than a sorting network.
+`ifndef ROUTER_TOPK_SERIAL
+  // Tournament tree. Same E-1 comparators as the serial scan below -- a tree
+  // and a linear scan both compare every element exactly once -- but the
+  // dependency chain is log2(E) deep instead of E-1 deep. The serial version
+  // paid 31 dependent 32-bit compares per pass for no area saving at all.
+  //
+  // P4 measured the cost of getting this wrong: WNS -1086.6 ns at a 10 ns clock
+  // on this exact sel[] path, and 2,518 combinational levels against
+  // sonic_acc's 59. See p2/README.md finding 16.
+  always_comb begin
+    logic signed [31:0] tmp [E];
+    logic signed [31:0] v [E];
+    logic [EW-1:0]      x [E];
+    for (int i = 0; i < E; i++) tmp[i] = $signed(score[i*32 +: 32]);
+    for (int k = 0; k < K; k++) begin
+      for (int i = 0; i < E; i++) begin
+        v[i] = tmp[i];
+        x[i] = EW'(i);
+      end
+      // Pairwise reduce: E -> E/2 -> ... -> 1, carrying the argmax alongside.
+      for (int s = E >> 1; s > 0; s = s >> 1)
+        for (int i = 0; i < s; i++)
+          if (v[i + s] > v[i]) begin
+            v[i] = v[i + s];
+            x[i] = x[i + s];
+          end
+      sel[k*EW +: EW] = x[0];
+      tmp[x[0]] = 32'sh8000_0000;   // exclude from the next pass
+    end
+  end
+`else
+  // Original serial max-extract, kept for differential comparison. Functionally
+  // identical: both return the K largest scores, ties broken toward the lowest
+  // index. Select with -DROUTER_TOPK_SERIAL.
   always_comb begin
     logic signed [31:0] tmp [E];
     logic signed [31:0] best;
@@ -171,5 +205,6 @@ module sonic_router #(
       tmp[bi] = 32'sh8000_0000;   // exclude from the next pass
     end
   end
+`endif
 
 endmodule

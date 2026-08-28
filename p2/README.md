@@ -185,10 +185,39 @@ Three consequences, in order of how much they hurt:
    what P4 is for. It does not make the design meet timing, and the resulting
    layout must not be quoted as evidence that it does.
 
-The fix is pipelining the score -> sigmoid PWL -> top-k -> select chain, which
-is RTL work in P2, not a knob in P4. Function is preserved by pipelining, so
-`make p2-router` stays valid against the real tensors once the bench's latency
-expectation is updated.
+### The cause, and the fix: a linear scan that should have been a tree
+
+The top-K block extracted each maximum with a **serial scan**:
+
+```systemverilog
+best = tmp[0];
+for (int i = 1; i < E; i++)                    // 31 DEPENDENT compares
+  if (tmp[i] > best) begin best = tmp[i]; bi = EW'(i); end
+```
+
+`best` carries from `i` to `i+1`, so one pass is E-1 = 31 dependent 32-bit
+comparisons, and the K passes are serially dependent through `tmp[bi]`. The
+comment defended this on area — "K*E comparators rather than a sorting network"
+— and the area claim is true but irrelevant: **a tournament tree compares every
+element exactly once too**, so it uses the same E-1 comparators while being
+log2(E) deep instead of E-1 deep.
+
+Measured, `LANES=4`, `SEGS=8`:
+
+| top-K structure | depth | cells |
+|---|---:|---:|
+| serial scan (was) | 2,518 | 116,236 |
+| **tournament tree (now)** | **461** | **107,387** |
+
+**5.5x shallower and 7.6% smaller.** The serial version was strictly worse on
+both axes; there was no tradeoff being made, only a cost being paid. The tree is
+now the default and `make p2-router` reproduces the original numbers exactly —
+top-1 1.0000, top-4 set 0.9961, exact order 0.9902 against the real 8.47 B
+tensors. The old structure is kept behind `-DROUTER_TOPK_SERIAL` for comparison.
+
+461 levels is still far too deep for 1 GHz and the remaining depth is the K
+serially-dependent passes plus the score/PWL datapath ahead of them. That part
+does need pipelining. But the first 5.5x cost nothing.
 
 **Why this was not caught sooner:** `sonic_router` was missing from `UNITS` in
 `ppa/loop.py`. The one unit with a pathological critical path was the one unit
