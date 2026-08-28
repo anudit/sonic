@@ -1,4 +1,4 @@
-.PHONY: all test golden p0 p1 p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
+.PHONY: all test golden p0 p0-gates p0-gates-uniform p1 p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
 
 # Homebrew's binutils shadows Apple's ar with GNU ar, whose archives macOS ld
 # rejects. Verilator links fail without this.
@@ -20,6 +20,17 @@ p0:
 	@python3 p0/recipe.py
 	@python3 p0/routing_trace.py synthetic
 	@python3 p0/dspark.py
+
+# P0-1 quality gates: the recipe vs BF16 on the real checkpoint.
+# CORPUS defaults to WikiText-2 via `datasets`; point it at a text file instead.
+CORPUS ?=
+p0-gates:
+	@.venv/bin/python p0/gates.py $(if $(CORPUS),--corpus $(CORPUS),) --max-tokens $(or $(TOKENS),65536)
+
+# Ablation: is the recipe's promotion of attention/routers/embedding earning
+# its 0.39 extra bits, or would flat INT4 clear the gates just as well?
+p0-gates-uniform:
+	@.venv/bin/python p0/gates.py $(if $(CORPUS),--corpus $(CORPUS),) --uniform
 
 # --- P1: architecture model ---
 p1:
