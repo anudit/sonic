@@ -11,4 +11,6 @@ p2/ppa/out/
 JOURNEY.md
 installed.md
 p4/out/
-dramsim3/build/
+# Third-party checkout, not vendored: p1/dram.py expects it at dramsim3/
+# and the Makefile builds it. See p1/README.md.
+dramsim3/
