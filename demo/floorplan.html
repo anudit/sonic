@@ -1,0 +1,466 @@
+<title>Sonic S1 Floorplan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+:root {
+  --substrate: #EDF0F3;
+  --surface:   #FFFFFF;
+  --surface-2: #E3E8EC;
+  --line:      #C3CCD4;
+  --line-soft: #DBE2E7;
+  --ink:       #131A21;
+  --ink-2:     #46545F;
+  --ink-3:     #6E7F8B;
+  --copper:    #B0602F;
+  --copper-lo: #F1E0D5;
+  --die-bg:    #DCE3E8;
+  --die-edge:  #A9B5BE;
+  --ok:        #2F6F52;
+  --warn:      #9A6212;
+
+  --c-mem:   #4E7C97;
+  --c-comp:  #B0602F;
+  --c-io:    #6B6785;
+  --c-ctrl:  #5E7A63;
+  --c-route: #8A5A72;
+  --c-fill:  #97A6B1;
+
+  --shadow: 0 1px 2px rgba(19,26,33,.07), 0 8px 24px -12px rgba(19,26,33,.18);
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+  --disp: "Archivo", var(--sans);
+}
+:root:not([data-theme="light"]) {
+  @media (prefers-color-scheme: dark) {
+    --substrate: #0F1319;
+    --surface:   #161C24;
+    --surface-2: #1E262F;
+    --line:      #2C3742;
+    --line-soft: #222B34;
+    --ink:       #E4EAF0;
+    --ink-2:     #A3B1BC;
+    --ink-3:     #74848F;
+    --copper:    #D98A55;
+    --copper-lo: #33231A;
+    --die-bg:    #131920;
+    --die-edge:  #35414D;
+    --ok:        #6BBF95;
+    --warn:      #D9A441;
+
+    --c-mem:   #5C93B3;
+    --c-comp:  #C87A45;
+    --c-io:    #8983A6;
+    --c-ctrl:  #75997C;
+    --c-route: #A9738E;
+    --c-fill:  #5C6C78;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  --substrate: #0F1319;
+  --surface:   #161C24;
+  --surface-2: #1E262F;
+  --line:      #2C3742;
+  --line-soft: #222B34;
+  --ink:       #E4EAF0;
+  --ink-2:     #A3B1BC;
+  --ink-3:     #74848F;
+  --copper:    #D98A55;
+  --copper-lo: #33231A;
+  --die-bg:    #131920;
+  --die-edge:  #35414D;
+  --ok:        #6BBF95;
+  --warn:      #D9A441;
+  --c-mem:   #5C93B3;
+  --c-comp:  #C87A45;
+  --c-io:    #8983A6;
+  --c-ctrl:  #75997C;
+  --c-route: #A9738E;
+  --c-fill:  #5C6C78;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--substrate); color: var(--ink);
+  font-family: var(--sans); font-size: 15px; line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 72px; }
+
+/* ---- masthead ---- */
+.mast { display: flex; flex-wrap: wrap; gap: 20px 32px; align-items: flex-end;
+        justify-content: space-between; padding-bottom: 22px;
+        border-bottom: 1px solid var(--line); }
+.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .16em;
+           text-transform: uppercase; color: var(--copper); margin: 0 0 8px; }
+h1 { font-family: var(--disp); font-weight: 800; font-size: clamp(30px, 5vw, 46px);
+     letter-spacing: -.022em; line-height: 1.02; margin: 0; text-wrap: balance; }
+.sub { color: var(--ink-2); margin: 10px 0 0; max-width: 56ch; }
+.mast-meta { display: flex; gap: 26px; font-family: var(--mono); font-size: 12px; }
+.mast-meta div span { display: block; color: var(--ink-3); font-size: 10.5px;
+                      letter-spacing: .1em; text-transform: uppercase; }
+.mast-meta div b { font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+
+/* ---- sku switch ---- */
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+            margin: 26px 0 18px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px;
+       overflow: hidden; background: var(--surface); }
+.seg button { appearance: none; border: 0; background: transparent; cursor: pointer;
+  font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--ink-2);
+  padding: 8px 15px; border-right: 1px solid var(--line-soft); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--copper); color: #fff; }
+.seg button:focus-visible { outline: 2px solid var(--copper); outline-offset: -2px; }
+.hint { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); }
+
+/* ---- layout ---- */
+.stage { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 22px;
+         align-items: start; }
+@media (max-width: 900px) { .stage { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .facts { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 420px) { .facts { grid-template-columns: 1fr; } }
+
+.die-shell { background: var(--surface); border: 1px solid var(--line);
+             border-radius: 10px; padding: 14px; box-shadow: var(--shadow); }
+.die-cap { display: flex; justify-content: space-between; align-items: baseline;
+           font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+           letter-spacing: .08em; text-transform: uppercase; margin-bottom: 10px; }
+svg.die { display: block; width: 100%; height: auto; }
+.blk { cursor: pointer; transition: opacity .12s ease; }
+.blk rect { stroke: var(--die-bg); stroke-width: 1.6; }
+.blk:hover rect, .blk.sel rect { stroke: var(--ink); stroke-width: 2.2; }
+.blk.dim { opacity: .3; }
+.blk text { font-family: var(--mono); font-size: 8.4px; fill: #fff;
+            pointer-events: none; font-weight: 500; }
+.blk text.sm { font-size: 7.2px; opacity: .82; }
+.blk:focus-visible rect { stroke: var(--copper); stroke-width: 3; outline: none; }
+
+/* ---- detail ---- */
+.panel { background: var(--surface); border: 1px solid var(--line);
+         border-radius: 10px; padding: 18px; box-shadow: var(--shadow);
+         position: sticky; top: 20px; }
+.panel h2 { font-family: var(--disp); font-size: 19px; font-weight: 700;
+            letter-spacing: -.01em; margin: 0 0 2px; line-height: 1.2; text-wrap: balance; }
+.swatch { width: 100%; height: 4px; border-radius: 2px; margin-bottom: 13px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px;
+      font-family: var(--mono); font-size: 12px; margin: 12px 0 0;
+      font-variant-numeric: tabular-nums; }
+.kv dt { color: var(--ink-3); }
+.kv dd { margin: 0; text-align: right; font-weight: 500; }
+.panel p { font-size: 13.5px; color: var(--ink-2); margin: 12px 0 0; }
+.tag { display: inline-block; font-family: var(--mono); font-size: 10px;
+       letter-spacing: .08em; text-transform: uppercase; padding: 3px 7px;
+       border-radius: 4px; background: var(--surface-2); color: var(--ink-2); }
+
+/* ---- legend + facts ---- */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px;
+          font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
+.legend button { appearance: none; background: transparent; border: 0; padding: 0;
+  cursor: pointer; font: inherit; color: inherit; display: inline-flex;
+  align-items: center; gap: 6px; }
+.legend button[aria-pressed="false"] { opacity: .38; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: block; }
+
+.facts { display: grid; grid-template-columns: repeat(3, 1fr);
+         gap: 1px; background: var(--line); border: 1px solid var(--line);
+         border-radius: 10px; overflow: hidden; margin-top: 28px; }
+.fact { background: var(--surface); padding: 15px 17px; }
+.fact span { display: block; font-family: var(--mono); font-size: 10.5px;
+             letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.fact b { font-family: var(--disp); font-weight: 700; font-size: 25px;
+          letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.fact small { display: block; color: var(--ink-2); font-size: 12px; margin-top: 3px; }
+
+.note { margin-top: 28px; padding: 16px 18px; border-left: 2px solid var(--copper);
+        background: var(--copper-lo); border-radius: 0 8px 8px 0; }
+.note p { margin: 0; font-size: 13.5px; color: var(--ink-2); max-width: 72ch; }
+.note b { color: var(--ink); }
+footer { margin-top: 34px; padding-top: 16px; border-top: 1px solid var(--line);
+         font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="mast">
+    <div>
+      <p class="eyebrow">Edge inference ASIC &middot; 14 nm</p>
+      <h1>Sonic S1 Floorplan</h1>
+      <p class="sub">Every block is drawn to its real area. The rectangles come
+      straight out of <code>sonic/roofline.area</code> &mdash; change the SKU and the
+      die re-proportions itself.</p>
+    </div>
+    <div class="mast-meta">
+      <div><span>Die</span><b id="m-die">&mdash;</b></div>
+      <div><span>Decode</span><b id="m-tok">&mdash;</b></div>
+      <div><span>Power</span><b id="m-pw">&mdash;</b></div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="SKU">
+      <button data-sku="A" aria-pressed="false">SKU A &middot; 25.6 GB/s</button>
+      <button data-sku="B" aria-pressed="true">SKU B &middot; 68.3 GB/s</button>
+      <button data-sku="C" aria-pressed="false">SKU C &middot; 136.5 GB/s</button>
+    </div>
+    <span class="hint">Click any block for detail &middot; filter by function below</span>
+  </div>
+
+  <div class="stage">
+    <div>
+      <div class="die-shell">
+        <div class="die-cap"><span id="cap-l">Floorplan</span><span id="cap-r"></span></div>
+        <svg class="die" id="die" viewBox="0 0 700 470" role="img"
+             aria-label="Sonic S1 die floorplan, blocks sized by area"></svg>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+
+  <div class="facts" id="facts"></div>
+
+  <div class="note">
+    <p><b>The one fact the design turns on.</b> Batch-1 decode is purely
+    memory-bound. At SKU B&rsquo;s 68.3 GB/s the array needs
+    <b id="n-lanes">119</b> lanes to keep up &mdash; it has <b>16,384</b>.
+    Everything above that exists for prefill, which is the only compute-bound
+    phase and the only latency a user feels. That is why the array is sized for
+    time-to-first-token and power-gated during generation.</p>
+  </div>
+
+  <footer>Areas, throughput and power computed by <code>sonic/roofline.py</code>
+  at 14&nbsp;nm. Routing overhead is 9% at 65% target density.</footer>
+</div>
+
+<script>
+const DATA = {"skus":{"A":{"bus":32,"gbps":25.6,"gb":8,"blocks":{"LPDDR5X x64 PHY":1.05,"Programmable vector unit":1.5,"Flash-attention engine":0.8,"Streamer + expert gather + dequant + AES":0.45,"Conv + vector units":0.43,"IO ring / ESD":0.4,"PLLs, LDOs, PVT":0.33,"RV32 + NoC + DFT":0.29,"Token-gather / ragged-GEMM scheduler":0.25,"LM head + sampler":0.14,"MoE router + top-k":0.05,"8 MB SRAM, 16 banks":6.4,"16,384-lane dual-mode array":5.7344,"_routing":1.6042,"_total":19.4286},"tok_s_8b":25.2,"tok_s_26b":16.9,"watts":2.05,"mj":81.4,"ttft":213.2,"bound":"compute","lanes":16384,"tile":128,"sram":8.0,"lanes_needed":44.5},"B":{"bus":64,"gbps":68.3,"gb":8,"blocks":{"LPDDR5X x64 PHY":2.09,"Programmable vector unit":1.5,"Flash-attention engine":0.8,"Streamer + expert gather + dequant + AES":0.45,"Conv + vector units":0.43,"IO ring / ESD":0.4,"PLLs, LDOs, PVT":0.33,"RV32 + NoC + DFT":0.29,"Token-gather / ragged-GEMM scheduler":0.25,"LM head + sampler":0.14,"MoE router + top-k":0.05,"8 MB SRAM, 16 banks":6.4,"16,384-lane dual-mode array":5.7344,"_routing":1.6978,"_total":20.5622},"tok_s_8b":67.3,"tok_s_26b":45.0,"watts":3.73,"mj":55.4,"ttft":213.2,"bound":"compute","lanes":16384,"tile":128,"sram":8.0,"lanes_needed":118.8},"C":{"bus":128,"gbps":136.5,"gb":8,"blocks":{"LPDDR5X x64 PHY":4.18,"Programmable vector unit":1.5,"Flash-attention engine":0.8,"Streamer + expert gather + dequant + AES":0.45,"Conv + vector units":0.43,"IO ring / ESD":0.4,"PLLs, LDOs, PVT":0.33,"RV32 + NoC + DFT":0.29,"Token-gather / ragged-GEMM scheduler":0.25,"LM head + sampler":0.14,"MoE router + top-k":0.05,"8 MB SRAM, 16 banks":6.4,"16,384-lane dual-mode array":5.7344,"_routing":1.8859,"_total":22.8403},"tok_s_8b":134.4,"tok_s_26b":90.0,"watts":6.4,"mj":47.6,"ttft":213.2,"bound":"compute","lanes":16384,"tile":128,"sram":8.0,"lanes_needed":237.4}},"model":{"total":8467755712,"active":1685566144,"sparsity":0.1991,"mb_tok":990.3,"avg_bits":4.7,"experts":32,"top_k":4,"layers":24,"conv":18,"attn":6,"d":2048,"kv_kb":6.144,"gop":3.37},"quant":{"MoE experts":{"bits":4.33,"kind":"int4","group":64,"why":"INT4_G64 plus a 2% INT8 outlier-row budget"},"Dense SwiGLU FFN":{"bits":4.25,"kind":"int4","group":64,"why":"4 + 16/64 bits, FP16 scale per group of 64"},"Dense FFN":{"bits":8.25,"kind":"int8g","group":64,"why":"8 + 16/64 bits; per-tensor INT8 wastes the promotion"},"Short-conv blocks":{"bits":4.25,"kind":"int4","group":64,"why":"4 + 16/64 bits, FP16 scale per group of 64"},"Tied embedding / LM head":{"bits":4.5,"kind":"int4","group":32,"why":"4 + 16/32 bits; measured better than an outlier budget here"},"GQA attention":{"bits":8.25,"kind":"int8g","group":64,"why":"8 + 16/64 bits; per-tensor INT8 wastes the promotion"},"Routers":{"bits":12.25,"kind":"int12","group":64,"why":"measured: 0.998 routing agreement; INT8 caps at 0.986"}},"gates":{"ppl_delta_max":0.15,"bench_drop_max":1.5,"top1_agreement_min":0.99,"routing_agreement_min":0.995,"avg_bits_max":4.75}};
+
+const GROUP = {
+  "16,384-lane dual-mode array": "comp",
+  "Flash-attention engine": "comp",
+  "Conv + vector units": "comp",
+  "Programmable vector unit": "comp",
+  "LM head + sampler": "comp",
+  "8 MB SRAM, 16 banks": "mem",
+  "4 MB SRAM, 8 banks": "mem",
+  "16 MB SRAM, 32 banks": "mem",
+  "LPDDR5X x64 PHY": "io",
+  "LPDDR5X x32 PHY": "io",
+  "LPDDR5X x128 PHY": "io",
+  "IO ring / ESD": "io",
+  "PLLs, LDOs, PVT": "io",
+  "RV32 + NoC + DFT": "ctrl",
+  "Token-gather / ragged-GEMM scheduler": "ctrl",
+  "Streamer + expert gather + dequant + AES": "route",
+  "MoE router + top-k": "route",
+  "_routing": "fill"
+};
+const GNAME = { comp:"Compute", mem:"On-die memory", io:"External interface",
+                ctrl:"Control", route:"Weight path", fill:"Routing / fill" };
+const GCOL  = { comp:"--c-comp", mem:"--c-mem", io:"--c-io",
+                ctrl:"--c-ctrl", route:"--c-route", fill:"--c-fill" };
+
+const NOTE = {
+  "16,384-lane dual-mode array":
+    "128\u00D7128 of INT4\u00D7INT8 MACs, sub-tiled 4\u00D764\u00B2 so a short expert wastes a quarter-sized pass instead of a full one. Weight-stationary in prefill, output-stationary in decode. Only ~3% utilised while generating \u2014 it is sized for time-to-first-token.",
+  "8 MB SRAM, 16 banks":
+    "The largest single block, and the reason chunked prefill works: it holds a 2048-token chunk's residual stream so each expert is read from DRAM once per chunk rather than once per token.",
+  "LPDDR5X x64 PHY":
+    "The bus that sets the product. Batch-1 decode reads 990 MB per token, so throughput is bandwidth divided by that number \u2014 the array never enters the equation.",
+  "Flash-attention engine":
+    "Online-softmax accumulation so a score row is never materialised. At 128K context the quadratic term is 66% of prefill; a two-pass softmax would double the KV reads.",
+  "Conv + vector units":
+    "Short-conv state is 18 layers \u00D7 2048 channels \u00D7 (k\u22121) taps = 72 KB and constant regardless of context length, unlike a KV cache. It stays on die across idle, so a conversation survives gaps with no DRAM traffic.",
+  "MoE router + top-k":
+    "0.05 mm\u00B2 that decides where every token goes. Needs INT12\u00D7INT12, not the shared INT8 activation bus \u2014 INT8 weights cap routing agreement at 0.986 against a 0.995 gate.",
+  "Streamer + expert gather + dequant + AES":
+    "Unpacks INT4 nibbles and applies one FP16 scale per group of 64 to the accumulated partial sum, not to individual weights \u2014 one multiply per group instead of 64.",
+  "LM head + sampler":
+    "Streams the 128K-row head and keeps only top-K, saving ~8% of all decode traffic for 0.14 mm\u00B2.",
+  "Token-gather / ragged-GEMM scheduler":
+    "Expert loads are uneven, so passes are ragged. This block sizes against the tail of the tokens-per-expert distribution, not its mean.",
+  "RV32 + NoC + DFT": "Control, not datapath. Descriptor-ring sequencing, on-chip network and test.",
+  "Programmable vector unit": "Normalisation, rotary embedding, residual adds \u2014 everything the systolic array cannot express.",
+  "IO ring / ESD": "Pads and protection.",
+  "PLLs, LDOs, PVT": "Clocks, regulation and process/voltage/temperature monitors.",
+  "_routing": "Interconnect and utilisation overhead \u2014 9% on top of the placed blocks at 65% target density."
+};
+
+/* Squarified treemap: areas stay proportional, aspect ratios stay readable. */
+function squarify(items, x, y, w, h) {
+  const out = [];
+  const total = items.reduce((s, i) => s + i.v, 0);
+  let list = items.map(i => ({ ...i, v0: i.v, v: i.v / total * w * h }));
+  const worst = (row, len) => {
+    const s = row.reduce((a, b) => a + b.v, 0);
+    const mx = Math.max(...row.map(r => r.v)), mn = Math.min(...row.map(r => r.v));
+    return Math.max(len * len * mx / (s * s), (s * s) / (len * len * mn));
+  };
+  function place(row, x, y, w, h, horiz) {
+    const s = row.reduce((a, b) => a + b.v, 0);
+    let off = 0;
+    for (const r of row) {
+      if (horiz) { const rw = r.v / s * w;
+        out.push({ ...r, x: x + off, y, w: rw, h: s / w }); off += rw; }
+      else { const rh = r.v / s * h;
+        out.push({ ...r, x, y: y + off, w: s / h, h: rh }); off += rh; }
+    }
+    return horiz ? { x, y: y + s / w, w, h: h - s / w }
+                 : { x: x + s / h, y, w: w - s / h, h };
+  }
+  let rect = { x, y, w, h };
+  while (list.length) {
+    const horiz = rect.w >= rect.h;
+    const len = horiz ? rect.w : rect.h;
+    let row = [list[0]], i = 1;
+    while (i < list.length && worst(row.concat(list[i]), len) <= worst(row, len)) {
+      row.push(list[i]); i++;
+    }
+    rect = place(row, rect.x, rect.y, rect.w, rect.h, horiz);
+    list = list.slice(i);
+  }
+  return out;
+}
+
+let sku = "B", selected = null;
+const off = new Set();
+
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (v, d = 2) => v.toFixed(d);
+
+function blocks() {
+  const b = DATA.skus[sku].blocks;
+  return Object.entries(b)
+    .filter(([k]) => k !== "_total")
+    .map(([k, v]) => ({ name: k, v, g: GROUP[k] || "ctrl" }))
+    .sort((a, z) => z.v - a.v);
+}
+
+function render() {
+  const s = DATA.skus[sku];
+  document.getElementById("m-die").textContent = fmt(s.blocks._total) + " mm\u00B2";
+  document.getElementById("m-tok").textContent = s.tok_s_8b + " tok/s";
+  document.getElementById("m-pw").textContent = fmt(s.watts) + " W";
+  document.getElementById("n-lanes").textContent = Math.round(s.lanes_needed);
+  document.getElementById("cap-l").textContent =
+    "SKU " + sku + " \u00B7 " + s.gbps + " GB/s \u00B7 " + s.gb + " GB";
+  document.getElementById("cap-r").textContent = fmt(s.blocks._total) + " mm\u00B2 die";
+
+  const all = blocks();
+  const shown = all.filter(b => !off.has(b.g));
+  const svg = document.getElementById("die");
+  const W = 700, H = 470, P = 10;
+  const laid = shown.length ? squarify(shown, P, P, W - 2 * P, H - 2 * P) : [];
+  const total = s.blocks._total;
+
+  let out = `<rect x="0" y="0" width="${W}" height="${H}" rx="6"
+    fill="var(--die-bg)" stroke="var(--die-edge)" stroke-width="1.5"/>`;
+  for (const r of laid) {
+    const pct = (r.v0 / total * 100);
+    const col = `var(${GCOL[r.g]})`;
+    const big = r.w > 92 && r.h > 34;
+    const mid = r.w > 60 && r.h > 22;
+    const label = r.name === "_routing" ? "Routing + fill" : r.name;
+    const sel = selected === r.name ? " sel" : "";
+    out += `<g class="blk${sel}" tabindex="0" role="button"
+      aria-label="${label}, ${fmt(r.v0)} square millimetres"
+      data-name="${label.replace(/"/g, "&quot;")}" data-key="${r.name.replace(/"/g, "&quot;")}">
+      <rect x="${r.x}" y="${r.y}" width="${Math.max(r.w, 1)}" height="${Math.max(r.h, 1)}"
+            rx="3" fill="${col}"/>`;
+    if (mid) {
+      const words = label.split(/\s+/);
+      let line = "", lines = [];
+      const cpl = Math.max(6, Math.floor(r.w / 5.1));
+      for (const w of words) {
+        if ((line + " " + w).trim().length > cpl) { lines.push(line.trim()); line = w; }
+        else line += " " + w;
+      }
+      lines.push(line.trim());
+      lines = lines.slice(0, big ? 3 : 2);
+      lines.forEach((ln, i) =>
+        out += `<text x="${r.x + 7}" y="${r.y + 16 + i * 10}">${ln}</text>`);
+      if (big) out += `<text class="sm" x="${r.x + 7}"
+        y="${r.y + 18 + lines.length * 10}">${fmt(r.v0)} mm\u00B2 \u00B7 ${pct.toFixed(1)}%</text>`;
+    }
+    out += `</g>`;
+  }
+  svg.innerHTML = out;
+
+  svg.querySelectorAll(".blk").forEach(g => {
+    const pick = () => { selected = g.dataset.key; render(); };
+    g.addEventListener("click", pick);
+    g.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); }
+    });
+  });
+
+  renderPanel();
+  renderLegend();
+  renderFacts();
+}
+
+function renderPanel() {
+  const s = DATA.skus[sku], p = document.getElementById("panel");
+  const all = blocks();
+  const b = all.find(x => x.name === selected) || all[0];
+  const label = b.name === "_routing" ? "Routing + fill" : b.name;
+  const pct = b.v / s.blocks._total * 100;
+  p.innerHTML = `
+    <div class="swatch" style="background:var(${GCOL[b.g]})"></div>
+    <h2>${label}</h2>
+    <span class="tag">${GNAME[b.g]}</span>
+    <dl class="kv">
+      <dt>Area</dt><dd>${fmt(b.v)} mm\u00B2</dd>
+      <dt>Share of die</dt><dd>${pct.toFixed(1)}%</dd>
+      <dt>Rank</dt><dd>${all.indexOf(b) + 1} of ${all.length}</dd>
+    </dl>
+    <p>${NOTE[b.name] || ""}</p>`;
+}
+
+function renderLegend() {
+  const counts = {};
+  for (const b of blocks()) counts[b.g] = (counts[b.g] || 0) + b.v;
+  document.getElementById("legend").innerHTML = Object.keys(GNAME)
+    .filter(g => counts[g])
+    .map(g => `<button data-g="${g}" aria-pressed="${!off.has(g)}">
+      <i style="background:var(${GCOL[g]})"></i>${GNAME[g]}
+      <span style="color:var(--ink-3)">${fmt(counts[g])}</span></button>`).join("");
+  document.querySelectorAll("#legend button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const g = btn.dataset.g;
+      off.has(g) ? off.delete(g) : off.add(g);
+      render();
+    });
+  });
+}
+
+function renderFacts() {
+  const s = DATA.skus[sku], m = DATA.model;
+  const f = [
+    ["Decode, 8B-A1B", s.tok_s_8b, "tok/s at 4K context", ""],
+    ["Time to first token", s.ttft, "ms at 2048 prompt \u00B7 " + s.bound + "-bound", ""],
+    ["Traffic per token", m.mb_tok, "MB at " + m.avg_bits + " bits/weight", ""],
+    ["Active parameters", (m.active / 1e9).toFixed(2), "of " + (m.total / 1e9).toFixed(2) + "B total \u2014 " + (m.sparsity * 100).toFixed(1) + "% sparsity", ""],
+    ["Energy", s.mj, "mJ per token", ""],
+    ["Lanes to saturate", Math.round(s.lanes_needed), "of " + s.lanes.toLocaleString() + " built", ""]
+  ];
+  document.getElementById("facts").innerHTML = f.map(([k, v, sub]) =>
+    `<div class="fact"><span>${k}</span><b>${v}</b><small>${sub}</small></div>`).join("");
+}
+
+document.querySelectorAll(".seg button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    sku = btn.dataset.sku; selected = null;
+    document.querySelectorAll(".seg button").forEach(b =>
+      b.setAttribute("aria-pressed", String(b.dataset.sku === sku)));
+    render();
+  });
+});
+
+render();
+</script>

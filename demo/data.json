@@ -1,0 +1,166 @@
+{
+ "skus": {
+  "A": {
+   "bus": 32,
+   "gbps": 25.6,
+   "gb": 8,
+   "blocks": {
+    "LPDDR5X x64 PHY": 1.05,
+    "Programmable vector unit": 1.5,
+    "Flash-attention engine": 0.8,
+    "Streamer + expert gather + dequant + AES": 0.45,
+    "Conv + vector units": 0.43,
+    "IO ring / ESD": 0.4,
+    "PLLs, LDOs, PVT": 0.33,
+    "RV32 + NoC + DFT": 0.29,
+    "Token-gather / ragged-GEMM scheduler": 0.25,
+    "LM head + sampler": 0.14,
+    "MoE router + top-k": 0.05,
+    "8 MB SRAM, 16 banks": 6.4,
+    "16,384-lane dual-mode array": 5.7344,
+    "_routing": 1.6042,
+    "_total": 19.4286
+   },
+   "tok_s_8b": 25.2,
+   "tok_s_26b": 16.9,
+   "watts": 2.05,
+   "mj": 81.4,
+   "ttft": 213.2,
+   "bound": "compute",
+   "lanes": 16384,
+   "tile": 128,
+   "sram": 8.0,
+   "lanes_needed": 44.5
+  },
+  "B": {
+   "bus": 64,
+   "gbps": 68.3,
+   "gb": 8,
+   "blocks": {
+    "LPDDR5X x64 PHY": 2.09,
+    "Programmable vector unit": 1.5,
+    "Flash-attention engine": 0.8,
+    "Streamer + expert gather + dequant + AES": 0.45,
+    "Conv + vector units": 0.43,
+    "IO ring / ESD": 0.4,
+    "PLLs, LDOs, PVT": 0.33,
+    "RV32 + NoC + DFT": 0.29,
+    "Token-gather / ragged-GEMM scheduler": 0.25,
+    "LM head + sampler": 0.14,
+    "MoE router + top-k": 0.05,
+    "8 MB SRAM, 16 banks": 6.4,
+    "16,384-lane dual-mode array": 5.7344,
+    "_routing": 1.6978,
+    "_total": 20.5622
+   },
+   "tok_s_8b": 67.3,
+   "tok_s_26b": 45.0,
+   "watts": 3.73,
+   "mj": 55.4,
+   "ttft": 213.2,
+   "bound": "compute",
+   "lanes": 16384,
+   "tile": 128,
+   "sram": 8.0,
+   "lanes_needed": 118.8
+  },
+  "C": {
+   "bus": 128,
+   "gbps": 136.5,
+   "gb": 8,
+   "blocks": {
+    "LPDDR5X x64 PHY": 4.18,
+    "Programmable vector unit": 1.5,
+    "Flash-attention engine": 0.8,
+    "Streamer + expert gather + dequant + AES": 0.45,
+    "Conv + vector units": 0.43,
+    "IO ring / ESD": 0.4,
+    "PLLs, LDOs, PVT": 0.33,
+    "RV32 + NoC + DFT": 0.29,
+    "Token-gather / ragged-GEMM scheduler": 0.25,
+    "LM head + sampler": 0.14,
+    "MoE router + top-k": 0.05,
+    "8 MB SRAM, 16 banks": 6.4,
+    "16,384-lane dual-mode array": 5.7344,
+    "_routing": 1.8859,
+    "_total": 22.8403
+   },
+   "tok_s_8b": 134.4,
+   "tok_s_26b": 90.0,
+   "watts": 6.4,
+   "mj": 47.6,
+   "ttft": 213.2,
+   "bound": "compute",
+   "lanes": 16384,
+   "tile": 128,
+   "sram": 8.0,
+   "lanes_needed": 237.4
+  }
+ },
+ "model": {
+  "total": 8467755712,
+  "active": 1685566144,
+  "sparsity": 0.1991,
+  "mb_tok": 990.3,
+  "avg_bits": 4.7,
+  "experts": 32,
+  "top_k": 4,
+  "layers": 24,
+  "conv": 18,
+  "attn": 6,
+  "d": 2048,
+  "kv_kb": 6.144,
+  "gop": 3.37
+ },
+ "quant": {
+  "MoE experts": {
+   "bits": 4.33,
+   "kind": "int4",
+   "group": 64,
+   "why": "INT4_G64 plus a 2% INT8 outlier-row budget"
+  },
+  "Dense SwiGLU FFN": {
+   "bits": 4.25,
+   "kind": "int4",
+   "group": 64,
+   "why": "4 + 16/64 bits, FP16 scale per group of 64"
+  },
+  "Dense FFN": {
+   "bits": 8.25,
+   "kind": "int8g",
+   "group": 64,
+   "why": "8 + 16/64 bits; per-tensor INT8 wastes the promotion"
+  },
+  "Short-conv blocks": {
+   "bits": 4.25,
+   "kind": "int4",
+   "group": 64,
+   "why": "4 + 16/64 bits, FP16 scale per group of 64"
+  },
+  "Tied embedding / LM head": {
+   "bits": 4.5,
+   "kind": "int4",
+   "group": 32,
+   "why": "4 + 16/32 bits; measured better than an outlier budget here"
+  },
+  "GQA attention": {
+   "bits": 8.25,
+   "kind": "int8g",
+   "group": 64,
+   "why": "8 + 16/64 bits; per-tensor INT8 wastes the promotion"
+  },
+  "Routers": {
+   "bits": 12.25,
+   "kind": "int12",
+   "group": 64,
+   "why": "measured: 0.998 routing agreement; INT8 caps at 0.986"
+  }
+ },
+ "gates": {
+  "ppl_delta_max": 0.15,
+  "bench_drop_max": 1.5,
+  "top1_agreement_min": 0.99,
+  "routing_agreement_min": 0.995,
+  "avg_bits_max": 4.75
+ }
+}
