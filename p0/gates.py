@@ -415,6 +415,12 @@ def main() -> int:
                          "clipping ratio; awq adds activation-aware scaling. All three\n"
                          "emit the SAME format -- only the scales and rounding differ")
     ap.add_argument("--calib-windows", type=int, default=4)
+    ap.add_argument("--emb-fmt", choices=["g64", "g32", "outlier", "int8g"],
+                    help="override the tied embedding / LM head format. The ablation "
+                         "puts it at +1.96 ppl from 3.1%% of the parameters, second "
+                         "worst per parameter. g32 and outlier cost 0.25 and 0.08 bits "
+                         "on that block; int8g costs 4 and is priced here to show why "
+                         "it is not free")
     ap.add_argument("--int8-group", action="store_true",
                     help="swap quant.py's PER-TENSOR INT8 for per-group INT8 (8.25 "
                          "bits). Measured: attention at per-tensor INT8 does 21x more "
@@ -476,6 +482,14 @@ def main() -> int:
 
     table = dict(quant.UNIFORM_INT4 if a.uniform else quant.BLOCK_FMT)
     label = "UNIFORM INT4 (ablation)" if a.uniform else "the recipe"
+    if a.emb_fmt:
+        table["Tied embedding / LM head"] = {
+            "g64": quant.INT4_G64,
+            "g32": quant.Fmt(4.5, "int4", 32, why="4 + 16/32 bits"),
+            "outlier": quant.Fmt(4.33, "int4", 64, 0.02, why="INT4_G64 + 2% INT8 rows"),
+            "int8g": quant.Fmt(8.25, "int8g", 64, why="per-group INT8"),
+        }[a.emb_fmt]
+        label += f" emb={a.emb_fmt}"
     if a.int8_group:
         g8 = quant.Fmt(8.25, "int8g", 64, why="per-group INT8; 8 + 16/64 bits")
         table = {k: (g8 if v.kind == "int8" else v) for k, v in table.items()}

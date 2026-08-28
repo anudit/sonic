@@ -132,13 +132,24 @@ def awq_best_scale(w, bits, group, act, alphas=ALPHA_GRID):
     bits/weight budget survives -- but the RTL must then apply a per-channel
     activation scale, which is a real requirement, not free.
     """
-    if act is None or w.shape[-1] != act.numel():
+    if act is None:
         return None
-    a = act.float().clamp(min=1e-6).to(w.device)
+    # act is either [in] (one vector for the tensor) or [E, in] (one per expert
+    # in a fused stack). The per-expert form matters: each expert sees a
+    # different subset of tokens, so a single averaged vector would scale the
+    # quiet experts by the busy ones' statistics.
+    if act.ndim == 2 and w.ndim == 3:
+        if act.shape != (w.shape[0], w.shape[-1]):
+            return None
+        a = act.float().clamp(min=1e-6).to(w.device).unsqueeze(1)   # [E,1,in]
+    elif act.ndim == 1 and w.shape[-1] == act.numel():
+        a = act.float().clamp(min=1e-6).to(w.device)
+    else:
+        return None
     best_err, best_s = None, None
     for alpha in alphas:
         s = a.pow(alpha)
-        s = s / s.log().mean().exp()               # unit geometric mean
+        s = s / s.log().mean(-1, keepdim=True).exp()   # unit geometric mean
         dq = q_group_clipped(w.float() * s, bits, group, grid=AWQ_CLIP_GRID) / s
         err = ((dq - w.float()) * a).pow(2).sum()
         if best_err is None or err < best_err:
@@ -148,12 +159,46 @@ def awq_best_scale(w, bits, group, act, alphas=ALPHA_GRID):
 
 # ------------------------------------------------------- calibration capture
 
-# Which parameter each module's input activation belongs to. The MoE expert
-# stack is the awkward one: gate_up_proj consumes the block input, but
-# down_proj consumes the intermediate produced inside the fused kernel, which
-# no forward hook can see. down_proj therefore falls back to RTN -- recorded
-# here rather than hidden, because it is a real limitation and down_proj is
-# where quant.py says the outliers live.
+# Every quantized tensor gets an activation vector, including both projections
+# of the fused expert stack -- see expert_hook, which replays the routing to
+# reconstruct what down_proj consumes.
+def expert_hook(name: str, acc: dict):
+    """Per-expert input magnitudes for BOTH projections of a fused expert stack.
+
+    gate_up_proj consumes the routed token subset; down_proj consumes
+    silu(gate) * up, computed inside the kernel where no hook can reach it. This
+    replays the routing and the first projection to reconstruct it exactly --
+    the same arithmetic Lfm2MoeExperts.forward does. Without this, down_proj
+    falls back to RTN, and quant.py says down_proj is where the outliers live.
+    """
+    import torch.nn.functional as F
+
+    def f(mod, args):
+        if len(args) < 2:
+            return
+        hs, topk = args[0], args[1]
+        hs = hs.reshape(-1, hs.shape[-1])
+        with torch.no_grad():
+            mask = F.one_hot(topk.reshape(hs.shape[0], -1),
+                             num_classes=mod.num_experts).permute(2, 1, 0)
+            gu = torch.zeros(mod.num_experts, mod.hidden_dim)
+            dn = torch.zeros(mod.num_experts, mod.intermediate_dim)
+            for ei in (mask.sum(dim=(-1, -2)) > 0).nonzero():
+                ei = ei[0]
+                _, tok = torch.where(mask[ei])
+                cs = hs[tok]
+                gu[ei] = cs.abs().float().mean(0).cpu()
+                gate, up = F.linear(cs, mod.gate_up_proj[ei]).chunk(2, dim=-1)
+                dn[ei] = (mod.act_fn(gate) * up).abs().float().mean(0).cpu()
+        for k, v in ((name + ".gate_up_proj", gu), (name + ".down_proj", dn)):
+            if k in acc:
+                acc[k][0] += v
+                acc[k][1] += 1
+            else:
+                acc[k] = [v, 1]
+    return f
+
+
 def collect_act_scales(model, ids: torch.Tensor, window: int, device: str,
                        max_windows: int = 4) -> dict[str, torch.Tensor]:
     """Mean |x| per input channel for every module we can hook."""
@@ -180,7 +225,7 @@ def collect_act_scales(model, ids: torch.Tensor, window: int, device: str,
         if isinstance(m, nn.Linear):
             handles.append(m.register_forward_pre_hook(hook(n + ".weight")))
         elif t == "Lfm2MoeExperts":
-            handles.append(m.register_forward_pre_hook(hook(n + ".gate_up_proj")))
+            handles.append(m.register_forward_pre_hook(expert_hook(n, acc)))
         elif t == "Lfm2MoeTopKRouter":
             handles.append(m.register_forward_pre_hook(hook(n + ".weight")))
 
