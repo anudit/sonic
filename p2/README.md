@@ -320,6 +320,41 @@ Separately pinned by the same bench: `y_out` is combinational from `x_in` while
 `out_vld` is registered, so when `out_vld` is high `y_out` already reflects the
 *next* sample. Consumers must sample `y_out` with `in_vld`.
 
+## Finding 20: the SiLU table spans the wrong range
+
+`make p3-layer` runs a whole MoE layer -- route, gather, gate_up GEMM, SiLU
+gate, down GEMM, combine -- on the real `sonic_tile` against the hidden state
+PyTorch produces from the same weights. It converged only after the activation
+table was fixed:
+
+| SiLU table | layer cosine | rel L1 |
+|---|---:|---:|
+| golden, 16 seg over ±8 | 0.9632 | 0.399 |
+| refit, 16 seg over ±8 | 0.9822 | 0.265 |
+| refit, 16 seg over ±2 | 0.9911 | 0.177 |
+| **refit, 16 seg over ±1** | **0.9912** | **0.176** |
+| refit, **8** seg over ±1 | 0.9911 | 0.177 |
+| refit, 16 seg over ±0.5 | 0.9837 | 0.185 |
+| exact SiLU | 0.9911 | 0.175 |
+
+**The range is the lever, not the segment count.** `gate_up` activations have
+mean magnitude 0.105, so a table spanning [-8, 8) puts every one of them inside
+the two segments straddling zero — exactly where SiLU curves hardest. Narrowing
+to ±1 reaches the accuracy of exact SiLU, and at ±1 **eight segments match
+sixteen**: the table can shrink, not grow. ±0.5 is worse again, because it
+starts clipping.
+
+This is the mirror of the router finding. There the sigmoid needed *more*
+segments (64 against the SiLU's 16); here the SiLU needs a *narrower range*.
+Same root cause both times — PWL resolution has to match the data's dynamic
+range — and neither is visible without running real activations through it.
+
+Separately, at the same ±8 range, refitting improved 0.9632 to 0.9822 on its own.
+That gap is the minimax-centring this repo already records as a finding for the
+router; `sonic_pwl_fit_silu` does not appear to get the same treatment.
+
+Both changes are free: `quant.SILU` marks the coefficients firmware-loadable.
+
 ## Caveats
 
 - Depth and cell counts come from `abc -g cmos2` against a **generic** library

@@ -57,7 +57,15 @@ BLOCK_FMT: dict[str, Fmt] = {
 ACCUM = dict(local_bits=16, fold=16, mid_bits=24, out_bits=32)
 ACTIVATION = dict(kind="int8", scale="per-token dynamic", clamp="calibrated percentile")
 KV = dict(default="int8", long_ctx="int4", threshold_ctx=32768, scale="per-head")
-SILU = dict(kind="pwl", segments=16, coeffs="firmware-loadable", fit="minimax")
+# Measured end to end on a real MoE layer (p2/tb/tb_layer.cpp): the RANGE, not
+# the segment count, is what costs accuracy. gate_up activations have mean
+# magnitude 0.105, so a table spanning [-8, 8) puts every one of them in the two
+# segments straddling zero, where SiLU curves hardest. Layer cosine against the
+# model: 0.963 at +/-8, 0.991 at +/-1, and 0.991 is what exact SiLU scores.
+# At +/-1, EIGHT segments match sixteen -- the table can shrink, not grow.
+# Costs nothing in hardware: the coefficients are firmware-loadable.
+SILU = dict(kind="pwl", segments=16, range=1.0, coeffs="firmware-loadable",
+            fit="minimax")
 # The router's sigmoid needs 4x the resolution of the FFN's SiLU: 16 segments
 # give 0.971 routing agreement, 32 give 0.990, 64 give 0.996.
 ROUTER_SIGMOID = dict(kind="pwl", segments=64, coeffs="firmware-loadable",
