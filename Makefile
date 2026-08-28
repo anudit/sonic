@@ -114,17 +114,32 @@ p4-router:
 LANES ?= 16
 PWL   ?= 64
 
-p4-router-ci:
-	@gh workflow run router-gds.yml -f lanes=$(LANES) -f pwl_segs=$(PWL)
-	@sleep 5
-	@gh run watch $$(gh run list --workflow=router-gds.yml -L1 --json databaseId -q '.[0].databaseId')
+RUN_LATEST = gh run list --workflow=router-gds.yml -L1 --json databaseId -q '.[0].databaseId'
 
+# Dispatch, then wait for a run id that is not the one that was newest before
+# dispatch -- GitHub takes a few seconds to register the run, and grabbing the
+# newest id too early watches the PREVIOUS run to completion instead.
+p4-router-ci:
+	@PREV=$$($(RUN_LATEST)); \
+	 gh workflow run router-gds.yml -f lanes=$(LANES) -f pwl_segs=$(PWL); \
+	 for i in $$(seq 1 30); do \
+	   ID=$$($(RUN_LATEST)); \
+	   [ "$$ID" != "$$PREV" ] && break; \
+	   sleep 2; \
+	 done; \
+	 echo "watching run $$ID"; gh run watch $$ID
+
+# Pull the newest run that actually produced artifacts, not merely the newest.
 p4-pull:
-	@rm -rf p4/out && mkdir -p p4/out
-	@gh run download $$(gh run list --workflow=router-gds.yml -L1 \
-		--json databaseId -q '.[0].databaseId') -D p4/out
-	@echo "--- pulled ---" && find p4/out -name '*.gds' -o -name '*.png' | sed 's/^/  /'
-	@open p4/out/*/sonic_router.png 2>/dev/null || true
+	@ID=$$(gh run list --workflow=router-gds.yml -L20 --status success \
+		--json databaseId -q '.[0].databaseId'); \
+	 [ -n "$$ID" ] || { echo "no successful run yet"; exit 1; }; \
+	 rm -rf p4/out && mkdir -p p4/out; \
+	 gh run download $$ID -D p4/out; \
+	 echo "--- pulled from run $$ID ---"; \
+	 find p4/out \( -name '*.gds' -o -name '*.png' \) | sed 's/^/  /'; \
+	 PNG=$$(find p4/out -name '*.png' | head -1); \
+	 [ -n "$$PNG" ] && open "$$PNG" || true
 
 numbers:
 	@python3 -m sonic.report

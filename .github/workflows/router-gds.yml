@@ -20,7 +20,14 @@ on:
     paths:
       - "p2/rtl/**"
       - "p4/openlane/**"
+      - "p4/render_gds.py"
       - ".github/workflows/router-gds.yml"
+
+# A P&R run is expensive and the useful answer is always the newest one. Without
+# this, a push during a run leaves two multi-hour jobs racing for the same quota.
+concurrency:
+  group: router-gds-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   gds:
@@ -29,7 +36,7 @@ jobs:
     timeout-minutes: 340
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Sky130 PDK + the LibreLane closure + a P&R run dir need more than the
       # runner has free by default.
@@ -48,6 +55,14 @@ jobs:
             extra-trusted-public-keys = nix-cache.fossi-foundation.org:3+K59iFwXqKsL7BNu6Guy0v+uTlwsxYQxjspXzqLYQs=
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
 
+      # volare re-downloads the whole Sky130 PDK otherwise, on every run.
+      - name: Cache Sky130 PDK
+        uses: actions/cache@v6
+        with:
+          path: ~/.volare
+          key: volare-sky130A-${{ hashFiles('p4/openlane/router/config.json') }}
+          restore-keys: volare-sky130A-
+
       # config.json holds the committed defaults (LANES=16). A manual dispatch
       # can override them without a commit.
       - name: Apply dispatch overrides
@@ -61,6 +76,7 @@ jobs:
           cat config.json
 
       - name: Run LibreLane
+        id: librelane
         working-directory: p4/openlane/router
         run: |
           nix run github:librelane/librelane -- \
@@ -70,7 +86,7 @@ jobs:
 
       # The layout picture. Batch-mode KLayout, full hierarchy, PNG.
       - name: Render layout
-        if: always()
+        if: steps.librelane.outcome == 'success'
         continue-on-error: true
         run: |
           sudo apt-get update -qq
@@ -84,22 +100,44 @@ jobs:
             -rd out="$PWD/render/sonic_router.png" \
             -rd size=4000
 
+      # Put the numbers in the run page itself, so the flow-validation result is
+      # readable without downloading an artifact.
+      - name: Summarise
+        if: always()
+        continue-on-error: true
+        run: |
+          M=$(ls -t p4/openlane/router/runs/ci/final/metrics.json 2>/dev/null | head -1)
+          {
+            echo "## sonic_router on sky130A"
+            if [ -n "$M" ]; then
+              echo '| metric | value |'
+              echo '|---|---|'
+              jq -r 'to_entries[]
+                     | select(.key | test("area|cell|wire|violation|wns|tns|util|power";"i"))
+                     | "| \(.key) | \(.value) |"' "$M" | head -40
+            else
+              echo "No metrics.json — the flow did not reach the end."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload GDS and final views
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sonic_router-gds
           if-no-files-found: warn
+          retention-days: 30
           path: |
             p4/openlane/router/runs/ci/final/
             render/*.png
 
       - name: Upload reports and metrics
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sonic_router-reports
           if-no-files-found: warn
+          retention-days: 14
           path: |
             p4/openlane/router/runs/ci/**/*.json
             p4/openlane/router/runs/ci/**/*.rpt
