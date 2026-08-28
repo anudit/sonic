@@ -26,7 +26,16 @@ class ChipSpec:
     sram_banks: int = 16
     bus_bits: int = 64              # LPDDR5X PHY width
     dram_gbps: float = 68.3
-    dram_eff: float = 1.00          # achieved fraction of peak; 0.85 is the P1 gate
+    # Achieved fraction of peak; 0.85 is the P1 gate. Still 1.00 deliberately:
+    # p1/dram.py measured the expert-gather PATTERN at 1.004x a pure sequential
+    # sweep (row-hit 0.9909 vs 0.9911 -- an expert is 5.96 MB contiguous, so the
+    # "gather" is four jumps between megabyte runs). That half of the risk is
+    # gone. The other half, absolute device efficiency, cannot be taken from
+    # that run: DRAMsim3 ships no LPDDR5X model and the LPDDR4 figure is
+    # controller-limited. Do not lower this to a number measured on the wrong
+    # device -- note that any realistic derate fails the 70 tok/s decode gate,
+    # which is itself the finding.
+    dram_eff: float = 1.00
     dram_gb: int = 8
 
     # --- energy, pJ/bit and pJ/op ---

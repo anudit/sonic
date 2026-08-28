@@ -1,4 +1,4 @@
-.PHONY: all test golden p0 p0-gates p0-gates-uniform p1 p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
+.PHONY: all test golden p0 p0-gates p0-gates-uniform p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
 
 # Homebrew's binutils shadows Apple's ar with GNU ar, whose archives macOS ld
 # rejects. Verilator links fail without this.
@@ -157,3 +157,27 @@ numbers:
 
 clean:
 	@rm -rf build p0/out p1/out __pycache__ */__pycache__
+
+# --- P1-3: DRAM efficiency of the expert-gather pattern (needs dramsim3 built)
+DRAM_OUT   := p1/out/dram
+DRAM_SIM   := dramsim3/build/dramsim3main
+DRAM_CFG   := configs/LPDDR4_8Gb_x16_2400.ini
+DRAM_LINES ?= 200000
+DRAM_CYC   ?= 100000
+
+$(DRAM_SIM):
+	@cd dramsim3/build && cmake .. -DCMAKE_BUILD_TYPE=Release \
+	  -DCMAKE_POLICY_VERSION_MINIMUM=3.5 >/dev/null && make -j8 >/dev/null
+	@echo "built $@"
+
+p1-dram: $(DRAM_SIM)
+	@mkdir -p $(DRAM_OUT)
+	@for p in stream expert scatter; do \
+	  python3 p1/dram_trace.py --pattern $$p --lines $(DRAM_LINES) \
+	    --out $(DRAM_OUT)/$$p.trace >/dev/null; \
+	  mkdir -p $(DRAM_OUT)/out_$$p; \
+	  (cd dramsim3 && ./build/dramsim3main $(DRAM_CFG) \
+	     -t $(CURDIR)/$(DRAM_OUT)/$$p.trace \
+	     -o $(CURDIR)/$(DRAM_OUT)/out_$$p -c $(DRAM_CYC) >/dev/null 2>&1); \
+	done
+	@python3 p1/dram.py

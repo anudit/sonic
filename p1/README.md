@@ -101,14 +101,52 @@ is the next thing to model, and it is now the only remaining reason to doubt
 The reference edge is anchored at 128 so adopting this moves no published
 figure: the S1 default still reports 20.56 mm².
 
+## The expert gather costs nothing (P1-3, measured)
+
+`make p1-dram`. Three patterns through DRAMsim3, every request injected at
+cycle 0 so the controller runs saturated, throughput read as reads completed in
+a fixed 100 K-cycle window:
+
+| pattern | GB/s | of peak | row-hit rate | ACTs | vs stream |
+|---|---:|---:|---:|---:|---:|
+| stream | 9.14 | 47.4% | 0.9911 | 106 | 1.000 |
+| **expert** | **9.18** | 47.6% | **0.9909** | 109 | **1.004** |
+| scatter | 9.53 | 49.5% | 0.0002 | 12,509 | 1.043 |
+
+**The gather is free**, and the reason is a number the plan already contained
+but had never applied here: **an expert is 5.96 MB of contiguous weights**,
+93,112 cache lines. The MoE "gather" is four jumps per layer between
+megabyte-scale sequential runs, not a scatter of small reads, so the row-buffer
+hit rate is at parity with a pure sweep — 0.9909 against 0.9911.
+
+The `scatter` control is the pattern the flat derate was implicitly feared to
+be. It is 4% *faster* than sequential, which is worth understanding rather than
+dismissing: with `address_mapping = rochrababgco` the column bits are last, so a
+sequential sweep serialises on one bank while random addresses spread across
+banks and ranks. At this queue depth the device is bank-parallelism-limited, not
+row-hit-limited. So the specific fear behind the flat derate — that the gather
+would thrash the row buffer — does not describe this device at all.
+
+**What this does not license.** The absolute 47% of peak is a property of this
+LPDDR4-2400 model and its controller (`cmd_queue_size = 8`), not of Sonic.
+`dram_eff` stays at 1.00 rather than being replaced by a number measured on the
+wrong device. DRAMsim3 ships no LPDDR5X config, so closing the absolute half
+needs either an authored LPDDR5X model or vendor data. That is now the whole of
+what P1-3 has left, and it is a narrower question than the one it started with.
+
+Note `dram_eff` is load-bearing: decode is 68.2 tok/s at 1.00 against a 70 tok/s
+gate, so any realistic derate fails it. That is a real finding for the SKU
+ladder, not a reason to keep the optimistic value.
+
 ## Open items
 
 1. ~~Charge for sub-tiling in `sonic/roofline.area`~~ — **done, above.** It costs
    ~2% of die and does not change the recommendation. Model the *bandwidth* cost
    of sub-tiling instead: that is where the penalty must be, if there is one.
-2. **Hook up a real DRAM timing model** (DRAMsim3). `dram_eff` is currently a
-   flat 1.0 in `chipspec.py` with 0.85 as the gate; the expert-gather access
-   pattern is exactly the case where a flat derate is least trustworthy.
+2. ~~Hook up a real DRAM timing model (DRAMsim3)~~ — **done for the pattern
+   half; see below.** The expert gather costs nothing. What remains unmeasured
+   is absolute device efficiency, which needs an LPDDR5X model DRAMsim3 does not
+   ship.
 3. ~~Re-run every sweep against measured routing~~ — **done**; P0-2 landed and
    the numbers above are measured, not modelled.
 4. **Model the fewer-larger-experts variant** (8 experts top-1) — it makes every
