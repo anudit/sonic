@@ -137,21 +137,32 @@ scale granularity.
 Changing INT8 from per-tensor to per-group-64 costs **0.022 bits per active
 weight** (4.639 -> 4.661, still inside the 4.75 gate) and buys:
 
+At 16 K tokens (screening; see the caution below):
+
 | configuration | `ppl_delta` | agreement (p>0.9) | active bits |
 |---|---:|---:|---:|
 | the recipe, RTN | +6.23 | 0.9900 | 4.639 |
 | + AWQ packing | +5.28 | 0.9895 | 4.639 |
 | + per-group INT8 | +3.81 | 0.9959 | 4.661 |
-| **both** | **+1.36** | **0.9950** | 4.661 |
+| both | +1.36 | 0.9950 | 4.661 |
 
-That single line in `quant.py` is worth more than the entire calibrated packer
-on its own — and the two compose **super-additively**. Alone they buy 0.95 and
-2.42; together they buy 4.87. Fixing the scale granularity on attention stops
-masking the gains AWQ makes everywhere else.
+**Both figures re-measured at 65 K tokens, which is what to quote:**
 
-At +1.36 the 95% CI over 16 K tokens is `[-0.61, +3.29]` — **unresolved**. The
-effect is now small enough that the measurement, not the recipe, is the limit;
-re-run with `--max-tokens 65536`.
+| configuration | `ppl_delta` | 95% CI | agreement (p>0.9) |
+|---|---:|---|---:|
+| the recipe, RTN | +6.44 | `[+5.21, +7.95]` | 0.9888 |
+| **AWQ + per-group INT8** | **+2.30** | `[+1.29, +3.32]` | **0.9935** |
+
+A 64% reduction at +0.022 bits per active weight, and the intervals do not
+overlap, so the improvement is real. That one line in `quant.py` is worth more
+than the entire calibrated packer on its own.
+
+**Do not quote the 16 K numbers.** At 16 K the combined configuration measured
++1.36 with a CI of `[-0.61, +3.29]`, which the harness flagged UNRESOLVED. The
+65 K measurement puts the true value at +2.30 — inside that interval, but nearly
+70% above the point estimate. The point estimate was optimistic noise and the
+UNRESOLVED verdict is the only thing standing between it and a published claim.
+This is the whole reason the bootstrap is there.
 
 The rest of the gap is still open. RTN is the weakest 4-bit scheme there is and
 AWQ only recovered 15% of it, limited by coverage rather than by the idea:
