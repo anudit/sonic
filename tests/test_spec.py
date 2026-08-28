@@ -53,9 +53,14 @@ def test_param_counts():
 # --- traffic, under the recipe and under the idealisation ---------------------
 
 def test_traffic():
-    close(M8.bytes_per_token(), 978.0)
-    close(M2.bytes_per_token(), 1472.1)
-    # The uniform-4.25-bit figure is ~8% optimistic; keep both visible so nobody
+    # Was 978.0 / 1472.1 while the recipe used per-tensor INT8 and a group-64
+    # embedding. Measuring the quality gates (p0/gates.py, 65K tokens) moved
+    # attention and the dense FFN to per-group INT8 and the embedding to
+    # group-32, which costs 12.3 MB/token and buys ppl_delta +6.44 -> +1.87.
+    # The traffic rise is the price of a recipe that had never been measured.
+    close(M8.bytes_per_token(), 990.3)
+    close(M2.bytes_per_token(), 1483.0)
+    # The uniform-4.25-bit figure is ~10% optimistic; keep both visible so nobody
     # quietly quotes the idealised one.
     close(M8.bytes_per_token(UNIFORM_INT4), 895.5)
     assert M8.bytes_per_token() > M8.bytes_per_token(UNIFORM_INT4)

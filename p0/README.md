@@ -91,7 +91,38 @@ result:
   embedding are read every token. Checking resident against an active gate
   passes for the wrong reason.
 
-## Measured: the recipe fails `ppl_delta` by 40x
+## The recipe changed. Two formats, measured, adopted
+
+`sonic/quant.py` now ships what P0-1 measured, not what it assumed:
+
+| block | was | is | why |
+|---|---|---|---|
+| GQA attention | INT8 per-tensor | **INT8 group-64** | per-tensor wasted the promotion |
+| Dense FFN | INT8 per-tensor | **INT8 group-64** | same |
+| Tied embedding / LM head | INT4 group-64 | **INT4 group-32** | beat an outlier budget at equal bits |
+
+**`ppl_delta` +6.44 -> +1.87**, CI `[+0.94, +2.81]`, at 4.700 active bits against
+a 4.75 gate. Traffic rises 978.0 -> 990.3 MB/token: 12.3 MB is the price of a
+recipe that had never been measured. `tests/test_spec.py` locks the new figures.
+
+The gate is still not met — +1.87 against 0.15 — and the remaining route is
+GPTQ-style error compensation in the packer, not more bits.
+
+### What this costs the RTL
+
+Both changes are parameter changes, not new mechanisms: `sonic_streamer.sv`
+already takes `GROUP` as a module parameter and applies one FP16 scale per group
+to the accumulated partial sum. Group-32 doubles the number of scale multiplies
+on the LM head path and halves `BEATS_PER_GROUP`.
+
+There is one hazard, now guarded. `BEATS_PER_GROUP = GROUP / LANES` is integer
+division: a `GROUP=32` instance at `LANES=64` computes **zero**, makes `beat` one
+bit wide, and never asserts `group_done` — the streamer would emit no scales at
+all, silently. That configuration was unreachable while every block was
+group-64; the embedding change makes it reachable. `sonic_streamer.sv` now
+`$fatal`s at elaboration on `GROUP < LANES` or a non-multiple.
+
+## How it was measured: the recipe as originally written
 
 16,376 tokens of WikiText-2 test, 8 windows of 2048, against the real 8.47 B
 checkpoint. Baseline BF16 perplexity 36.089.
@@ -164,14 +195,39 @@ than the entire calibrated packer on its own.
 UNRESOLVED verdict is the only thing standing between it and a published claim.
 This is the whole reason the bootstrap is there.
 
-The rest of the gap is still open. RTN is the weakest 4-bit scheme there is and
-AWQ only recovered 15% of it, limited by coverage rather than by the idea:
-`down_proj` holds the outliers `quant.py` warns about and consumes an
-intermediate produced inside the fused `Lfm2MoeExperts` kernel, which no forward
-hook can see. Closing the remainder needs GPTQ-style sequential error
-compensation, and probably a finer group or an outlier budget on the tied
-embedding. All of that is **offline packer work**: the hardware formats stay
-INT4 group-64 plus an outlier budget throughout.
+### The tied embedding: group-32, not an outlier budget
+
+The other block the ablation indicted, priced at 65 K tokens on top of the
+per-group INT8 fix:
+
+| embedding format | `ppl_delta` | 95% CI | active bits | within 4.75? |
+|---|---:|---|---:|---|
+| `outlier` (2% INT8 rows) | +2.40 | `[+1.52, +3.29]` | 4.674 | yes |
+| **`g32`** | **+1.87** | `[+0.94, +2.81]` | **4.700** | yes |
+| `int8g` | +0.74 | `[-0.06, +1.48]` | 5.283 | **no** |
+
+**A finer group beats an outlier budget here**, which is the opposite of what
+works on the MoE experts. The reason is structural: expert weights have a few
+pathological *rows*, so promoting 2% of rows targets the damage precisely. The
+embedding's error is spread evenly across 128 K vocabulary rows with no
+outlier structure to exploit, so halving the group size — which helps every row
+— wins, and for a comparable 0.25 bits.
+
+`int8g` is the quality winner and is **unaffordable**: 5.283 bits against a 4.75
+gate. The embedding is read every token, so four extra bits on it is ~131 MB per
+token against a 978 MB budget. It is listed to price the temptation, not as a
+candidate.
+
+`g32` leaves only 0.05 bits of headroom under the gate. That is the binding
+constraint on any further promotion, and it should be spent deliberately.
+
+### What is still open
+
+Closing the remainder needs GPTQ-style sequential error compensation — a
+second-order method that adjusts the not-yet-quantized weights to absorb the
+error already committed, which neither scaling nor clipping can do. All of it is
+**offline packer work**: the hardware formats stay INT4 group-64 plus an outlier
+budget throughout.
 
 Two things the controls established, which cost more to learn than to state:
 

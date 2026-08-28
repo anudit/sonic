@@ -49,6 +49,20 @@ module sonic_streamer #(
 
   localparam int BEATS_PER_GROUP = GROUP / LANES;
 
+  // GROUP < LANES makes this integer division zero, `beat` one bit wide, and
+  // the group_done comparison against BEATS_PER_GROUP-1 never true -- the
+  // streamer would emit no scales at all, silently. P0-1 moved the tied
+  // embedding to group-32 (measured: better than an outlier budget for the same
+  // bits), so a GROUP=32 instance is now a real configuration and this is a
+  // real hazard rather than a theoretical one.
+  if (GROUP < LANES) begin : gen_group_lt_lanes
+    $fatal(1, "sonic_streamer: GROUP (%0d) must be >= LANES (%0d)", GROUP, LANES);
+  end
+  if (GROUP % LANES != 0) begin : gen_group_not_multiple
+    $fatal(1, "sonic_streamer: GROUP (%0d) must be a multiple of LANES (%0d)",
+           GROUP, LANES);
+  end
+
   logic [$clog2(BEATS_PER_GROUP+1)-1:0] beat;
   logic signed [15:0]                   scale_q;
 

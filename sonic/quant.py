@@ -23,7 +23,17 @@ class Fmt:
 
 INT4_G64 = Fmt(4.25, "int4", 64, why="4 + 16/64 bits, FP16 scale per group of 64")
 INT4_OUT = Fmt(4.33, "int4", 64, 0.02, "INT4_G64 plus a 2% INT8 outlier-row budget")
-INT8 = Fmt(8.0, "int8", 0, why="per-tensor scale")
+# Measured (p0/gates.py, 65K tokens): halving the group beats spending the same
+# bits on an outlier budget for the embedding -- +1.87 vs +2.40 ppl_delta. The
+# embedding's error is spread evenly over 128K vocabulary rows with no outlier
+# structure to exploit, which is the opposite of the expert weights.
+INT4_G32 = Fmt(4.5, "int4", 32, why="4 + 16/32 bits; measured better than an outlier budget here")
+INT8 = Fmt(8.0, "int8", 0, why="per-tensor scale; depthwise conv kernels only")
+# Per-tensor INT8 was the single worst block per parameter: attention at 0.74%
+# of the weights cost +1.86 ppl on its own, 21x the MoE experts per parameter,
+# because one tensor-wide scale gives relerr 0.031 against per-group 0.006. The
+# promotion to 8 bits was being bought and then thrown away.
+INT8_G64 = Fmt(8.25, "int8g", 64, why="8 + 16/64 bits; per-tensor INT8 wastes the promotion")
 BF16 = Fmt(16.0, "bf16", 0, why="tiny cost, removes a class of debugging")
 # Router datapath, measured on 512 real layer-5 hidden states from the 8.47 B
 # checkpoint (p3/export_vectors.py, p2/tb/tb_router.cpp). INT8 weights cap
@@ -36,10 +46,10 @@ INT12 = Fmt(12.25, "int12", 64, why="measured: 0.998 routing agreement; INT8 cap
 BLOCK_FMT: dict[str, Fmt] = {
     "MoE experts": INT4_OUT,            # w2 outliers dominate the average
     "Dense SwiGLU FFN": INT4_G64,
-    "Dense FFN": INT8,                  # only the 2 leading layers of the MoE
+    "Dense FFN": INT8_G64,              # only the 2 leading layers of the MoE
     "Short-conv blocks": INT4_G64,      # conv kernels themselves are INT8, 0.04% of the block
-    "Tied embedding / LM head": INT4_G64,
-    "GQA attention": INT8,
+    "Tied embedding / LM head": INT4_G32,
+    "GQA attention": INT8_G64,
     "Routers": INT12,
 }
 
