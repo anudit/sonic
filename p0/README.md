@@ -8,11 +8,11 @@ throughput sets the product.
 
 | # | Deliverable | Artifact | Status |
 |---|---|---|---|
-| P0-1 | Frozen format spec | `sonic/quant.py`, gates via `p0/gates.py` | **harness ready, unrun** |
+| P0-1 | Frozen format spec | `sonic/quant.py`, gates via `p0/gates.py` | **measured; two formats changed; ppl gate still unmet** |
 | P0-2 | Measured expert overlap and routing locality | `p0/routing_trace.py` | **DONE — real traces** |
 | P0-3 | Speculative-decode budget for DSpark | `p0/dspark.py` | drafted |
 | P0-4 | Bit-exact C golden model | `p0/golden/` | primitives only |
-| P0-5 | Per-layer accumulator bounds from real activations | `p0/golden/test_golden.c` | worst-case only |
+| P0-5 | Per-layer accumulator bounds from real activations | `p0/accbound.py` | **measured — 12 bits refuted; INT8 blocks need 18** |
 
 ## Gates
 
@@ -35,6 +35,7 @@ python3 p0/routing_trace.py trace --trace p0/out/real_routing.npz   # once trace
 
 make p0-gates CORPUS=wikitext2.txt     # the quality gates, vs BF16
 make p0-gates-uniform CORPUS=...       # ablation: is the promotion earning its bits?
+make p0-accbound                       # local accumulator vs real activations
 ```
 
 ## The quality gates: what `p0/gates.py` does and does not measure
