@@ -196,12 +196,12 @@ p1-dram: $(DRAM_SIM)
 	done
 	@python3 p1/dram.py
 
-# sonic_conv's bench currently FAILS on a real RTL bug (p2/README finding 19),
-# so it is not in p2-units. Run it deliberately.
+# sonic_conv is built at CH=4 so its packed ports fit a word; p2-units keeps
+# the units whose benches need no parameter override.
 p2-conv:
 	@rm -rf build/obj_conv
 	@verilator --cc --exe -O2 -Wno-fatal -Ip2/rtl -CFLAGS "-O2" \
 	  --Mdir build/obj_conv --top-module sonic_conv -GCH=4 \
 	  p2/rtl/sonic_conv.sv p2/tb/tb_conv.cpp >/dev/null 2>&1
 	@$(MAKE) -C build/obj_conv -f Vsonic_conv.mk $(AR_FIX) -j8 >/dev/null 2>&1
-	@./build/obj_conv/Vsonic_conv || true
+	@./build/obj_conv/Vsonic_conv

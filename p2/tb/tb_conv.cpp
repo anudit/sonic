@@ -203,7 +203,9 @@ static void test_vld_timing() {
     dut->state_clr = 1; tick(); dut->state_clr = 0;
     uint64_t kern = 1;
     int8_t a[CH], b[CH], c[CH], y[CH];
-    for (int i = 0; i < CH; i++) { a[i] = 40; b[i] = -40; c[i] = 64; }
+    // Values that requantize to DIFFERENT outputs, or 'advanced' is
+    // unobservable: 100*127>>>14 = 1 and -100*127>>>14 = -1.
+    for (int i = 0; i < CH; i++) { a[i] = 100; b[i] = -100; c[i] = 127; }
 
     dut->x_in = pack(a); dut->c_gate = pack(c); dut->kern = kern;
     dut->k_taps = 1; dut->in_vld = 1; dut->eval();

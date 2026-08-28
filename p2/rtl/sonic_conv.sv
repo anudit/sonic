@@ -69,8 +69,17 @@ module sonic_conv #(
 
       always_comb begin
         prod[0] = xv[c] * tap[0];
-        for (int t = 1; t < KMAX; t++)
-          prod[t] = (t < int'(k_taps)) ? hist[c][t-1] * tap[t] : '0;
+        // if/else, NOT a ternary. `'0` is an unsigned unsized literal, and
+        // SystemVerilog makes an entire expression unsigned if any operand is,
+        // so `cond ? (signed * signed) : '0` silently evaluates the multiply
+        // UNSIGNED. Measured: tap = -2 multiplied as 254, so hist 10 * tap -2
+        // gave +2540 instead of -20. prod[0] escaped only because it is not in
+        // a ternary. Same family as findings 12-15 -- an expression rule
+        // quietly changing the hardware -- but signedness rather than width.
+        for (int t = 1; t < KMAX; t++) begin
+          if (t < int'(k_taps)) prod[t] = hist[c][t-1] * tap[t];
+          else                  prod[t] = '0;
+        end
         sum = '0;
         for (int t = 0; t < KMAX; t++) sum += `ACC_MID'(prod[t]);
       end
