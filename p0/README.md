@@ -137,13 +137,21 @@ scale granularity.
 Changing INT8 from per-tensor to per-group-64 costs **0.022 bits per active
 weight** (4.639 -> 4.661, still inside the 4.75 gate) and buys:
 
-| configuration | `ppl_delta` | agreement (p>0.9) |
-|---|---:|---:|
-| the recipe, RTN | +6.23 | 0.9900 |
-| + AWQ packing | +5.28 | 0.9895 |
-| + per-group INT8 | **+3.81** | **0.9959** |
+| configuration | `ppl_delta` | agreement (p>0.9) | active bits |
+|---|---:|---:|---:|
+| the recipe, RTN | +6.23 | 0.9900 | 4.639 |
+| + AWQ packing | +5.28 | 0.9895 | 4.639 |
+| + per-group INT8 | +3.81 | 0.9959 | 4.661 |
+| **both** | **+1.36** | **0.9950** | 4.661 |
 
-That single line in `quant.py` is worth more than the entire calibrated packer.
+That single line in `quant.py` is worth more than the entire calibrated packer
+on its own — and the two compose **super-additively**. Alone they buy 0.95 and
+2.42; together they buy 4.87. Fixing the scale granularity on attention stops
+masking the gains AWQ makes everywhere else.
+
+At +1.36 the 95% CI over 16 K tokens is `[-0.61, +3.29]` — **unresolved**. The
+effect is now small enough that the measurement, not the recipe, is the limit;
+re-run with `--max-tokens 65536`.
 
 The rest of the gap is still open. RTN is the weakest 4-bit scheme there is and
 AWQ only recovered 15% of it, limited by coverage rather than by the idea:
