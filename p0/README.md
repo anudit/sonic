@@ -108,13 +108,51 @@ checkpoint. Baseline BF16 perplexity 36.089.
 resolved well above it. **The recipe as specified does not clear its own quality
 gate.**
 
-The formats are not the problem — the *method* is. This harness does naive
-round-to-nearest. RTN at 4 bits is the weakest possible scheme; clearing a
-0.15 ppl gate at 4.64 bits requires calibrated quantization (GPTQ/AWQ-style
-error compensation or activation-aware scaling). That is a requirement on the
-**offline packer**, not on the silicon: the hardware formats stay INT4 group-64
-plus an outlier budget either way. The next step is to implement calibration in
-the packer and re-run, not to widen the formats.
+### Where the damage actually is
+
+Per-block ablation, each block quantized alone with the rest left at BF16:
+
+| block | active | format | `ppl_delta` | per B active |
+|---|---:|---|---:|---:|
+| GQA attention | 0.063 B | INT8 per-tensor | +1.86 | **29.5** |
+| Tied embedding / LM head | 0.262 B | INT4 g64 | +1.96 | 7.5 |
+| Dense FFN | 0.088 B | INT8 per-tensor | +0.59 | 6.7 |
+| MoE experts | 0.969 B | INT4 g64 + outliers | +1.37 | **1.4** |
+| Short-conv blocks | 0.302 B | INT4 g64 | −0.07 | — |
+| Routers | 0.001 B | INT12 g64 | −0.09 | — |
+
+Sum of parts +5.62 against +6.23 for the whole recipe, so the effects are close
+to additive and the ablation is trustworthy.
+
+**The recipe's promotions are where it loses, not its aggressive formats.** The
+MoE experts are 92% of the parameters at the cheapest format and they are the
+*least* damaging per parameter, by 21x. Attention is promoted to 8 bits to
+protect it and is the single worst block per parameter — because `quant.py`
+specifies INT8 as a **per-tensor** scale, whose relative error is 0.031 against
+per-group INT8's 0.006. The extra 4 bits are bought and then thrown away by the
+scale granularity.
+
+### The cheapest fix found so far
+
+Changing INT8 from per-tensor to per-group-64 costs **0.022 bits per active
+weight** (4.639 -> 4.661, still inside the 4.75 gate) and buys:
+
+| configuration | `ppl_delta` | agreement (p>0.9) |
+|---|---:|---:|
+| the recipe, RTN | +6.23 | 0.9900 |
+| + AWQ packing | +5.28 | 0.9895 |
+| + per-group INT8 | **+3.81** | **0.9959** |
+
+That single line in `quant.py` is worth more than the entire calibrated packer.
+
+The rest of the gap is still open. RTN is the weakest 4-bit scheme there is and
+AWQ only recovered 15% of it, limited by coverage rather than by the idea:
+`down_proj` holds the outliers `quant.py` warns about and consumes an
+intermediate produced inside the fused `Lfm2MoeExperts` kernel, which no forward
+hook can see. Closing the remainder needs GPTQ-style sequential error
+compensation, and probably a finer group or an outlier budget on the tied
+embedding. All of that is **offline packer work**: the hardware formats stay
+INT4 group-64 plus an outlier budget throughout.
 
 Two things the controls established, which cost more to learn than to state:
 

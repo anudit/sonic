@@ -415,6 +415,11 @@ def main() -> int:
                          "clipping ratio; awq adds activation-aware scaling. All three\n"
                          "emit the SAME format -- only the scales and rounding differ")
     ap.add_argument("--calib-windows", type=int, default=4)
+    ap.add_argument("--int8-group", action="store_true",
+                    help="swap quant.py's PER-TENSOR INT8 for per-group INT8 (8.25 "
+                         "bits). Measured: attention at per-tensor INT8 does 21x more "
+                         "damage per parameter than the experts at INT4, because the "
+                         "promotion to 8 bits is wasted by a single tensor-wide scale")
     ap.add_argument("--uniform", action="store_true",
                     help="ablation: flat INT4_G64 everywhere, ignoring the recipe's promotions")
     ap.add_argument("--force", choices=["int12", "int8g", "int8", "int4", "bf16"],
@@ -471,6 +476,10 @@ def main() -> int:
 
     table = dict(quant.UNIFORM_INT4 if a.uniform else quant.BLOCK_FMT)
     label = "UNIFORM INT4 (ablation)" if a.uniform else "the recipe"
+    if a.int8_group:
+        g8 = quant.Fmt(8.25, "int8g", 64, why="per-group INT8; 8 + 16/64 bits")
+        table = {k: (g8 if v.kind == "int8" else v) for k, v in table.items()}
+        label += " with per-group INT8"
     if a.force:
         INT8_G64 = quant.Fmt(8.25, "int8g", 64, why="control: per-group INT8")
         table = {k: {"int12": quant.INT12, "int8g": INT8_G64, "int8": quant.INT8,
