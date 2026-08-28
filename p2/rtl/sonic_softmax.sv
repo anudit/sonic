@@ -32,12 +32,46 @@ module sonic_softmax #(
   output logic signed [DW-1:0]  acc
 );
 
+  localparam logic signed [DW-1:0] ONE_Q16 = DW'(1 << 16);
+  localparam int DW2 = 2 * DW;
+
+  // Q16 multiply at DOUBLE width. `l_q * corr` with two DW-wide operands is a
+  // DW-wide multiply in SystemVerilog -- self-determined width -- so the
+  // product overflows and truncates BEFORE the >>>16 that was supposed to
+  // rescale it. At DW=32 that makes 1.0 * 1.0 evaluate to 0.0, which pins the
+  // running sum at 1.0 forever. Same family as findings 12-15: sizing a
+  // multiply off its operand width rather than its result width.
+  function automatic logic signed [DW-1:0] mulq16(
+      input logic signed [DW-1:0] x, input logic signed [DW-1:0] y);
+    logic signed [DW2-1:0] p;
+    begin
+      p = DW2'(x) * DW2'(y);
+      mulq16 = DW'(p >>> 16);
+    end
+  endfunction
+
   logic signed [DW-1:0] m_q, l_q, a_q;
   logic signed [DW-1:0] m_new;
+  logic                 new_max;
+  logic signed [DW-1:0] corr, wgt;
 
   // Rescale factor when a new maximum arrives: exp(m_old - m_new).
-  assign m_new   = (in_vld && score > m_q) ? score : m_q;
-  assign exp_arg = (in_vld && score > m_q) ? (m_q - m_new) : (score - m_new);
+  assign new_max = in_vld && (score > m_q);
+  assign m_new   = new_max ? score : m_q;
+  assign exp_arg = new_max ? (m_q - m_new) : (score - m_new);
+
+  // One PWL lookup serves both factors because exactly one of them is always
+  // exp(0) = 1: on a new maximum the lookup is the RESCALE and the incoming
+  // weight is 1; otherwise the lookup is the WEIGHT and the rescale is 1.
+  //
+  // Using exp_val for both -- which is what this module did -- is the bug its
+  // own comment warns about. It loses the first score outright (at m = -inf the
+  // rescale underflows to 0 and the new term is multiplied by that same 0) and
+  // thereafter scales the running sum by the incoming weight instead of by the
+  // correction. tb_softmax.cpp failed all four score patterns against
+  // p0/golden/sonic_golden.c before this.
+  assign corr = new_max ? exp_val : ONE_Q16;
+  assign wgt  = new_max ? ONE_Q16 : exp_val;
 
   always_ff @(posedge clk or negedge rst_n) begin
     // Async reset and sync clear are separate branches on purpose -- see the
@@ -55,8 +89,8 @@ module sonic_softmax #(
       // Both the running sum and the accumulator rescale by the same factor,
       // so their ratio -- the softmax output -- is unchanged. Rescaling only
       // one of them is the classic online-softmax bug.
-      l_q <= DW'(((l_q * exp_val) >>> 16) + exp_val);
-      a_q <= DW'(((a_q * exp_val) >>> 16) + ((value * exp_val) >>> 16));
+      l_q <= mulq16(l_q, corr) + wgt;
+      a_q <= mulq16(a_q, corr) + mulq16(value, wgt);
     end
   end
 

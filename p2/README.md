@@ -9,14 +9,14 @@ first commit.
 | # | Deliverable | Artifact | Status |
 |---|---|---|---|
 | P2-1 | Hierarchical accumulator | `rtl/sonic_acc.sv` | **done, verified** |
-| P2-2 | Dual-mode PE with banked accumulators | `rtl/sonic_pe.sv` | drafted, unverified |
+| P2-2 | Dual-mode PE with banked accumulators | `rtl/sonic_pe.sv` | **done, verified** |
 | P2-6 | MoE top-k router | `rtl/sonic_router.sv` | **done, verified vs the 8.47B model** |
-| P2-3 | Differential bench vs. the golden model | `tb/tb_acc.cpp` | done for P2-1 |
+| P2-3 | Differential bench vs. the golden model | `tb/tb_*.cpp` | 6 of 9 units |
 | P2-4 | Automated PPA loop | `ppa/loop.py` | done |
 | P2-5a | 64x64 dual-mode systolic sub-tile | `rtl/sonic_tile.sv` | **done, verified** |
 | P2-5b | Weight streamer + expert gather | `rtl/sonic_streamer.sv` | done, unverified |
 | P2-5c | Short-conv unit (k<=7, double-gated) | `rtl/sonic_conv.sv` | done, unverified |
-| P2-5d | Online-softmax attention accumulator | `rtl/sonic_softmax.sv` | done, unverified |
+| P2-5d | Online-softmax attention accumulator | `rtl/sonic_softmax.sv` | **done, verified — two bugs found** |
 | P2-5e | Streaming LM head + top-K | `rtl/sonic_lmhead.sv` | **done, verified** |
 | P2-5f | Descriptor-ring sequencer | `rtl/sonic_seq.sv` | done, unverified |
 
@@ -229,6 +229,50 @@ though outside the default sweep — even at `SEGS=8` it takes minutes under
 python3 p2/ppa/loop.py --unit sonic_router
 ```
 
+## Finding 17: two bugs in `sonic_softmax`, both found by its first bench
+
+The module's own comment named the bug it meant to avoid — "rescaling only one
+of them is the classic online-softmax bug". It had that bug, and another.
+
+**One `exp_val` was used for both factors.** `exp_arg` is cleverly built so that
+exactly one of the two factors is always `exp(0) = 1`: on a new maximum the
+lookup is the rescale and the incoming weight is 1; otherwise the lookup is the
+weight and the rescale is 1. The update then used `exp_val` for *both*
+(`l_q*exp_val + exp_val`), which loses the first score outright — at
+`m = -inf` the rescale underflows to 0 and the new term is multiplied by that
+same 0 — and thereafter scales the running sum by the incoming weight instead of
+by the correction. Fixed by muxing `corr` and `wgt`, which costs one mux and no
+extra PWL lookup.
+
+**The Q16 multiply was truncating before its shift.** `l_q * corr` with two
+`DW`-wide operands is a `DW`-wide multiply in SystemVerilog — self-determined
+width — so at `DW = 32` the product overflows and truncates *before* the
+`>>> 16` meant to rescale it. `1.0 * 1.0` evaluated to `0.0`, pinning the
+running sum at 1.0 forever. This is the same family as findings 12-15: sizing a
+multiply off its operand width rather than its result width. Fixed with an
+explicit double-width intermediate; the multiply is 32x32 -> 64, the same size
+finding 12 settled on for the router epilogue.
+
+Both bugs were in RTL that linted clean, synthesized, and had been reported as
+"done". `tb_softmax.cpp` failed all four score patterns — flat, rising,
+falling, mixed — against `p0/golden/sonic_golden.c` before the fix and passes
+all of them after.
+
+## Finding 18: `sonic_pe` is correct, and the worst-case bound now holds in RTL
+
+39 checks, no failures. Bank isolation under interleaved access, the
+`MODE_PREFILL` / `MODE_DECODE` weight select including a mid-reduction switch,
+and ungated one-cycle systolic pass-through all hold.
+
+The bench also drives the pattern the accumulator widths were sized against —
+every product at maximum magnitude and identical sign, to the full `D = 2048`
+reduction depth — and confirms no stage overflows. P0-5 proved that bound in the
+C model; it is now proved in the RTL as well.
+
+One design question is pinned rather than answered: `ovf` is `|bank_ovf`, so an
+overflow in any bank raises it on every read. Nothing here overflows, so the
+bench records the scope rather than exercising it.
+
 ## Caveats
 
 - Depth and cell counts come from `abc -g cmos2` against a **generic** library
@@ -237,7 +281,8 @@ python3 p2/ppa/loop.py --unit sonic_router
 - `loop.py --sweep NAME=0,1` passes `-DNAME=0` and `-DNAME=1`, both of which
   *define* the macro. Boolean defines must be compared against a separate
   undefined baseline run.
-- `sonic_pe.sv` is drafted but has no bench yet. Do not trust its numbers.
+- `sonic_conv.sv`, `sonic_streamer.sv` and `sonic_seq.sv` still have no bench.
+  Findings 16-18 are what "synthesizes" is worth without one.
 
 ## macOS toolchain note
 

@@ -54,8 +54,18 @@ p2: build/sonic_golden.o
 	@$(MAKE) --no-print-directory iv
 	@python3 p2/ppa/loop.py
 
-# P2-5 units: dual-mode systolic tile and the streaming LM head.
-p2-units:
+# P2-5 units. sonic_pe and sonic_softmax link the C golden model; tile and
+# lmhead are self-checking.
+p2-units: build/sonic_golden.o
+	@for u in pe softmax; do \
+	  rm -rf build/obj_$$u; \
+	  verilator --cc --exe -O2 -Wall -Wno-DECLFILENAME -Ip2/rtl \
+	    -CFLAGS "-I$(CURDIR)/p0/golden -O2" --Mdir build/obj_$$u \
+	    --top-module sonic_$$u p2/rtl/sonic_acc.sv p2/rtl/sonic_$$u.sv \
+	    p2/tb/tb_$$u.cpp $(CURDIR)/build/sonic_golden.o >/dev/null 2>&1; \
+	  $(MAKE) -C build/obj_$$u -f Vsonic_$$u.mk $(AR_FIX) -j8 >/dev/null 2>&1; \
+	  printf "  sonic_%-8s " "$$u"; ./build/obj_$$u/Vsonic_$$u | tail -1; \
+	done
 	@for u in tile lmhead; do \
 	  rm -rf build/obj_$$u; \
 	  verilator --cc --exe -O2 -Wall -Wno-DECLFILENAME -Ip2/rtl \
