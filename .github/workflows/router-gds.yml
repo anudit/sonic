@@ -1,0 +1,115 @@
+name: router RTL-to-GDS
+
+# Block-level place-and-route for sonic_router on Sky130, run on an x86-64
+# Linux runner because there is no OpenROAD for Darwin ARM. See p4/README.md.
+#
+# Nix here is incidental: LibreLane distributes itself as a flake, and on a
+# throwaway Linux runner Nix costs nothing (no /nix volume, no sudo, no
+# uninstall). The FOSSi binary cache means nothing is compiled from source.
+
+on:
+  workflow_dispatch:
+    inputs:
+      lanes:
+        description: "LANES (16 is tractable; 64 is the shipping width, multi-hour)"
+        default: "16"
+      pwl_segs:
+        description: "ROUTER_PWL_SEGS"
+        default: "64"
+  push:
+    paths:
+      - "p2/rtl/**"
+      - "p4/openlane/**"
+      - ".github/workflows/router-gds.yml"
+
+jobs:
+  gds:
+    name: sonic_router -> GDS (sky130A)
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sky130 PDK + the LibreLane closure + a P&R run dir need more than the
+      # runner has free by default.
+      - name: Reclaim disk
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          df -h /
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            extra-substituters = https://nix-cache.fossi-foundation.org
+            extra-trusted-public-keys = nix-cache.fossi-foundation.org:3+K59iFwXqKsL7BNu6Guy0v+uTlwsxYQxjspXzqLYQs=
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+
+      # config.json holds the committed defaults (LANES=16). A manual dispatch
+      # can override them without a commit.
+      - name: Apply dispatch overrides
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: p4/openlane/router
+        run: |
+          jq --arg l "LANES=${{ inputs.lanes }}" \
+             --arg d "ROUTER_PWL_SEGS=${{ inputs.pwl_segs }}" \
+             '.SYNTH_PARAMETERS = [$l] | .VERILOG_DEFINES = [$d]' \
+             config.json > config.tmp && mv config.tmp config.json
+          cat config.json
+
+      - name: Run LibreLane
+        working-directory: p4/openlane/router
+        run: |
+          nix run github:librelane/librelane -- \
+            --run-tag ci \
+            --pdk-root "$HOME/.volare" \
+            config.json
+
+      # The layout picture. Batch-mode KLayout, full hierarchy, PNG.
+      - name: Render layout
+        if: always()
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq klayout xvfb
+          GDS=$(ls -t p4/openlane/router/runs/ci/final/gds/*.gds 2>/dev/null | head -1)
+          [ -n "$GDS" ] || { echo "no GDS produced"; exit 1; }
+          mkdir -p render
+          xvfb-run -a klayout -z -nc \
+            -r p4/render_gds.py \
+            -rd gds="$GDS" \
+            -rd out="$PWD/render/sonic_router.png" \
+            -rd size=4000
+
+      - name: Upload GDS and final views
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonic_router-gds
+          if-no-files-found: warn
+          path: |
+            p4/openlane/router/runs/ci/final/
+            render/*.png
+
+      - name: Upload reports and metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sonic_router-reports
+          if-no-files-found: warn
+          path: |
+            p4/openlane/router/runs/ci/**/*.json
+            p4/openlane/router/runs/ci/**/*.rpt
+            p4/openlane/router/runs/ci/**/*.log
+
+      # A failed P&R run is the interesting case; make the tail readable
+      # without downloading an artifact.
+      - name: Tail failing logs
+        if: failure()
+        run: |
+          for f in $(ls -t p4/openlane/router/runs/ci/*/*.log 2>/dev/null | head -3); do
+            echo "::group::$f"; tail -80 "$f"; echo "::endgroup::"
+          done

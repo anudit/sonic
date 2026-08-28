@@ -1,0 +1,41 @@
+{
+  "architectures": [
+    "Lfm2DSparkDraftModel"
+  ],
+  "model_type": "qwen3",
+  "dtype": "bfloat16",
+  "hidden_size": 2048,
+  "num_hidden_layers": 5,
+  "num_attention_heads": 32,
+  "num_key_value_heads": 8,
+  "head_dim": 64,
+  "intermediate_size": 6144,
+  "hidden_act": "silu",
+  "rms_norm_eps": 1e-05,
+  "vocab_size": 128000,
+  "rope_theta": 5000000.0,
+  "max_position_embeddings": 128000,
+  "layer_types": [
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention",
+    "full_attention"
+  ],
+  "block_size": 9,
+  "dflash_config": {
+    "mask_token_id": 125017,
+    "target_layer_ids": [
+      2,
+      6,
+      10,
+      14,
+      18
+    ],
+    "num_target_layers": 24
+  },
+  "markov_rank": 256,
+  "rope_is_neox_style": false,
+  "enable_confidence_head": true,
+  "markov_head_type": "vanilla"
+}

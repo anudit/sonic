@@ -1,0 +1,17 @@
+# Yosys synthesis + static timing estimate for one Sonic S1 unit.
+#
+# Deliberately technology-independent (abc9 against a generic cell library):
+# the goal is a RELATIVE signal for the automated loop -- did this RTL change
+# make the critical path longer or shorter -- not an absolute f_max. Absolute
+# numbers need the foundry library at P4.
+#
+# Invoked by p2/ppa/loop.py, which sweeps parameters and logs the results.
+
+read_verilog -sv -I../rtl ${SRC}
+hierarchy -top ${TOP}
+proc; opt; fsm; opt; memory; opt
+techmap; opt
+abc -g cmos2 -dff
+opt_clean
+stat
+tee -o ${REPORT} stat

@@ -1,0 +1,22 @@
+{
+  "DESIGN_NAME": "sonic_router",
+  "VERILOG_FILES": ["dir::../../../p2/rtl/sonic_router.sv"],
+  "VERILOG_INCLUDE_DIRS": ["dir::../../../p2/rtl"],
+  "VERILOG_DEFINES": ["ROUTER_PWL_SEGS=64"],
+  "SYNTH_PARAMETERS": ["LANES=16"],
+
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 10,
+
+  "FP_CORE_UTIL": 40,
+  "PL_TARGET_DENSITY_PCT": 45,
+  "FP_ASPECT_RATIO": 1,
+
+  "RUN_HEURISTIC_DIODE_INSERTION": true,
+  "GRT_ALLOW_CONGESTION": true,
+
+  "// clock": "10 ns is deliberately slack. Sky130 at 130 nm cannot hit the 1 GHz S1 targets, and forcing it only produces buffer bloat that makes the layout less representative, not more.",
+  "// lanes": "LANES=16 rather than the shipping 64: same structure, quarter the multiplier array, tractable runtime. See p4/README.md.",
+  "// util": "40% utilisation leaves the router room. The top-k network is a wide combinational cone over a 1024-bit score register and is the congestion hot spot.",
+  "// keys": "LibreLane errors on unrecognised config keys. Only keys beginning with // are exempt, which is why the comments look like this."
+}

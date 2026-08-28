@@ -1,0 +1,825 @@
+<title>Sonic S1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+
+<style>
+:root{
+  --paper:#F1F3F7; --surface:#FFFFFF; --surface-2:#E8EBF1;
+  --ink:#181C29; --ink-2:#3B4358; --muted:#646D84;
+  --rule:#D6DAE4; --rule-strong:#B6BDCC;
+  --copper:#AC4F27; --copper-soft:#F0E2DA;
+  --teal:#1A6A63; --teal-soft:#DDEBE9;
+  --warn:#8A6410; --warn-soft:#F4EBD5;
+  --f-display:"IBM Plex Sans Condensed","Helvetica Neue",Arial,sans-serif;
+  --f-body:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --col:min(68ch,100%); --wide:min(1060px,100%);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0E1116; --surface:#161A22; --surface-2:#1D222C;
+    --ink:#E3E7EF; --ink-2:#BEC5D4; --muted:#8D96A9;
+    --rule:#262C38; --rule-strong:#39414F;
+    --copper:#DD8047; --copper-soft:#2A1D15;
+    --teal:#4FB3A6; --teal-soft:#12251F;
+    --warn:#D6A93E; --warn-soft:#251E10;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0E1116; --surface:#161A22; --surface-2:#1D222C;
+  --ink:#E3E7EF; --ink-2:#BEC5D4; --muted:#8D96A9;
+  --rule:#262C38; --rule-strong:#39414F;
+  --copper:#DD8047; --copper-soft:#2A1D15;
+  --teal:#4FB3A6; --teal-soft:#12251F;
+  --warn:#D6A93E; --warn-soft:#251E10;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-body);
+  font-size:16.5px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.page{display:grid;grid-template-columns:1fr var(--col) 1fr;padding:0 20px 96px}
+.page > *{grid-column:2}
+.page > .bleed{grid-column:1/-1;justify-self:center;width:var(--wide)}
+
+.mast{border-bottom:1px solid var(--rule-strong);padding:56px 0 26px;margin-bottom:40px}
+.eyebrow{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--copper);margin:0 0 18px}
+h1{font-family:var(--f-display);font-weight:700;font-size:clamp(40px,8vw,68px);
+  line-height:1.0;letter-spacing:-.018em;margin:0 0 8px;text-wrap:balance}
+.subtitle{font-family:var(--f-display);font-weight:600;font-size:clamp(19px,3vw,25px);
+  line-height:1.25;color:var(--muted);margin:0 0 24px;text-wrap:balance}
+.standfirst{font-size:17.5px;color:var(--ink-2);margin:0}
+.standfirst em{color:var(--ink);font-style:italic}
+
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(146px,1fr));gap:1px;
+  background:var(--rule);border:1px solid var(--rule);margin:36px 0 8px}
+.strip div{background:var(--surface);padding:14px 16px}
+.strip dt{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.strip dd{font-family:var(--f-mono);font-weight:500;font-size:19px;
+  font-variant-numeric:tabular-nums;margin:0;color:var(--ink)}
+.strip dd span{font-size:12.5px;color:var(--muted)}
+
+section{margin-top:60px}
+h2{font-family:var(--f-display);font-weight:700;font-size:clamp(25px,4vw,32px);
+  line-height:1.14;letter-spacing:-.01em;margin:0 0 4px;text-wrap:balance}
+.sec-tag{font-family:var(--f-mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);display:block;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--rule)}
+h3{font-family:var(--f-display);font-weight:600;font-size:19.5px;line-height:1.25;margin:34px 0 8px}
+h4{font-family:var(--f-mono);font-weight:600;font-size:12.5px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--copper);margin:26px 0 6px}
+p{margin:0 0 16px}
+ul,ol{margin:0 0 16px;padding-left:1.25em}
+li{margin-bottom:7px}
+li::marker{color:var(--muted)}
+a{color:var(--copper)}
+strong{font-weight:600}
+code{font-family:var(--f-mono);font-size:.87em;background:var(--surface-2);padding:1px 5px;border-radius:2px}
+pre{font-family:var(--f-mono);font-size:12.5px;line-height:1.55;background:var(--surface);
+  border:1px solid var(--rule);border-left:3px solid var(--copper);padding:14px 18px;
+  overflow-x:auto;margin:20px 0}
+
+.tw{overflow-x:auto;margin:22px 0 26px;border:1px solid var(--rule);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+caption{caption-side:top;text-align:left;font-family:var(--f-mono);font-size:11px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:12px 16px;
+  border-bottom:1px solid var(--rule);background:var(--surface-2)}
+th,td{padding:9px 16px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
+thead th{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);font-weight:500;border-bottom:1px solid var(--rule-strong);white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+td.n,th.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.total td{font-weight:600;border-top:1px solid var(--rule-strong);background:var(--surface-2)}
+tr.hi td{background:var(--copper-soft)}
+.bar{display:block;height:4px;background:var(--copper);margin-top:5px;border-radius:1px}
+.bar.d{background:var(--rule-strong)}
+.sub{color:var(--muted);font-size:13px}
+
+.note{border-left:3px solid var(--copper);background:var(--copper-soft);padding:16px 20px;margin:26px 0}
+.note p:last-child{margin-bottom:0}
+.note.good{border-left-color:var(--teal);background:var(--teal-soft)}
+.note.risk{border-left-color:var(--warn);background:var(--warn-soft)}
+.note .lbl{font-family:var(--f-mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;display:block;margin-bottom:7px;color:var(--muted)}
+
+figure{margin:30px 0 26px}
+figcaption{font-family:var(--f-mono);font-size:11.5px;color:var(--muted);margin-top:12px;line-height:1.5}
+.plan{width:100%;height:auto;display:block;border:1px solid var(--rule);background:var(--surface)}
+
+.phases{list-style:none;padding:0;margin:26px 0 0;border-top:1px solid var(--rule-strong)}
+.phases li{display:grid;grid-template-columns:56px 1fr;gap:0 20px;padding:20px 0;
+  border-bottom:1px solid var(--rule);margin:0}
+.phases .idx{font-family:var(--f-mono);font-size:12px;font-weight:600;color:var(--copper);padding-top:3px}
+.phases h3{margin:0 0 4px;font-size:18px}
+.phases .dur{font-family:var(--f-mono);font-size:11px;color:var(--muted);
+  letter-spacing:.06em;text-transform:uppercase;margin:0 0 9px}
+.phases p{margin:0 0 10px;font-size:15.5px;color:var(--ink-2)}
+.gate{font-family:var(--f-mono);font-size:12.5px;line-height:1.5;
+  border-top:1px dotted var(--rule-strong);padding-top:9px;color:var(--ink)}
+.gate b{color:var(--teal);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:10.5px}
+
+.kv{display:grid;grid-template-columns:auto 1fr;gap:2px 18px;font-family:var(--f-mono);
+  font-size:13px;margin:16px 0 22px}
+.kv dt{color:var(--muted);white-space:nowrap}
+.kv dd{margin:0;font-variant-numeric:tabular-nums}
+
+footer{margin-top:64px;padding-top:20px;border-top:1px solid var(--rule-strong);
+  font-family:var(--f-mono);font-size:12px;color:var(--muted);line-height:1.6}
+
+@media (max-width:640px){
+  body{font-size:16px}.page{padding:0 16px 72px}
+  .phases li{grid-template-columns:1fr;gap:0}.phases .idx{padding:0 0 4px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+:focus-visible{outline:2px solid var(--copper);outline-offset:2px}
+</style>
+
+<div class="page">
+
+<header class="mast">
+  <p class="eyebrow">Silicon program proposal</p>
+  <h1>Sonic&nbsp;S1</h1>
+  <p class="subtitle">A 20.6 mm² edge inference ASIC with a dedicated prefill engine, built for LiquidAI LFM2.5-8B-A1B</p>
+  <p class="standfirst">Most accelerator designs size the array for peak TOPS and discover afterwards that decode never uses it. S1 starts from the opposite fact: decode on this model is <em>entirely</em> memory-bound and needs 119 multiply lanes, while prefill is the only compute-bound phase and is the only latency a user actually feels. So the array is sized for time-to-first-token, runs two different dataflows, and power-gates the moment generation starts.</p>
+</header>
+
+<dl class="strip bleed">
+  <div><dt>Die, 14 nm LPP</dt><dd>20.6 <span>mm² · 4.53 mm sq</span></dd></div>
+  <div><dt>Decode</dt><dd>68 <span>tok/s @ 3.7 W</span></dd></div>
+  <div><dt>TTFT, 2K prompt</dt><dd>213 <span>ms</span></dd></div>
+  <div><dt>Array</dt><dd>32.8 <span>TOPS INT4</span></dd></div>
+  <div><dt>Energy</dt><dd>55 <span>mJ / token</span></dd></div>
+</dl>
+
+<section>
+  <span class="sec-tag">01 — Workload</span>
+  <h2>Two models, one die</h2>
+
+  <p>S1 targets <strong>LFM2.5-8B-A1B</strong> as its primary model and runs the dense <strong>LFM2.5-2.6B</strong> on the same silicon and the same firmware. Both are hybrid architectures — short causal convolution blocks interleaved with a small number of GQA attention layers — which is what makes them tractable on a small die.</p>
+
+  <div class="tw">
+    <table>
+      <caption>Both targets, from their config.json</caption>
+      <thead><tr><th>&nbsp;</th><th class="n">LFM2.5-8B-A1B</th><th class="n">LFM2.5-2.6B</th></tr></thead>
+      <tbody>
+        <tr><td>Layers</td><td class="n">24 — 18 conv / 6 attention</td><td class="n">30 — 22 conv / 8 attention</td></tr>
+        <tr><td>Hidden size</td><td class="n">2048</td><td class="n">2048</td></tr>
+        <tr><td>Feed-forward</td><td class="n">32 experts × 1792, top-4<br><span class="sub">2 leading dense layers at 7168</span></td><td class="n">dense SwiGLU at 10752</td></tr>
+        <tr><td>Attention</td><td class="n">32 q / 8 kv, head dim 64</td><td class="n">32 q / 8 kv, head dim 64</td></tr>
+        <tr><td>RoPE θ</td><td class="n">5e6</td><td class="n">1e7</td></tr>
+        <tr><td>Conv cache</td><td class="n">3 taps</td><td class="n">3 taps</td></tr>
+        <tr><td>Vocab, tied</td><td class="n">128,000</td><td class="n">128,000</td></tr>
+        <tr class="total"><td>Parameters</td><td class="n">8.47 B — 1.69 B active</td><td class="n">2.70 B — all active</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The MoE is the better workload for this chip in almost every dimension, which is why it is primary. Only 19.9% of it is active per token, so despite being 3.2× larger it streams <strong>1.6× fewer bytes</strong>. It also has four fewer attention layers, which makes both its KV cache and its prefill cheaper.</p>
+
+  <div class="tw">
+    <table>
+      <caption>Parameter budget — LFM2.5-8B-A1B</caption>
+      <thead><tr><th>Block</th><th class="n">Total</th><th class="n">Active / token</th><th class="n">Share of traffic</th></tr></thead>
+      <tbody>
+        <tr><td>MoE experts (22 layers × 32, top-4)</td><td class="n">7,751.1 M</td><td class="n">968.9 M</td><td class="n">57.5%<span class="bar" style="width:57.5%"></span></td></tr>
+        <tr><td>Short-conv blocks (18)</td><td class="n">302.1 M</td><td class="n">302.1 M</td><td class="n">17.9%<span class="bar" style="width:17.9%"></span></td></tr>
+        <tr><td>Tied embedding / LM head</td><td class="n">262.1 M</td><td class="n">262.1 M</td><td class="n">15.5%<span class="bar" style="width:15.5%"></span></td></tr>
+        <tr><td>Dense FFN (layers 0–1)</td><td class="n">88.1 M</td><td class="n">88.1 M</td><td class="n">5.2%<span class="bar" style="width:5.2%"></span></td></tr>
+        <tr><td>GQA attention (6 layers)</td><td class="n">62.9 M</td><td class="n">62.9 M</td><td class="n">3.7%<span class="bar" style="width:3.7%"></span></td></tr>
+        <tr><td>Routers</td><td class="n">1.4 M</td><td class="n">1.4 M</td><td class="n">0.1%<span class="bar" style="width:0.1%"></span></td></tr>
+        <tr class="total"><td>Total</td><td class="n">8,467.8 M</td><td class="n">1,685.6 M</td><td class="n">19.9% active</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <dl class="kv">
+    <dt>Streamed per decoded token</dt><dd>978 MB @ 4.64 bits avg &nbsp;(dense 2.6B: 1,472 MB)</dd>
+    <dt>Arithmetic per token</dt><dd>3.37 GOP &nbsp;→ arithmetic intensity 3.45 OP/byte</dd>
+    <dt>Resident weights</dt><dd>4,649 MB → an 8 GB LPDDR5X part</dd>
+    <dt>KV cache</dt><dd>6.14 KB/token &nbsp;(dense 2.6B: 8.19 KB)</dd>
+    <dt>Conv state</dt><dd>72 KB, constant regardless of context — lives on die</dd>
+  </dl>
+
+  <div class="note good">
+    <span class="lbl">The governing equation</span>
+    <p>Decode throughput is <strong>bandwidth ÷ 0.978 GB</strong> and nothing else. At 68.3 GB/s that is 119 G weights/sec, and batch-1 GEMV consumes one multiply per weight — so <strong>119 lanes saturate the memory system</strong>. Every one of S1's 16,384 lanes beyond that exists for prefill. This single fact determines the entire floorplan.</p>
+  </div>
+</section>
+
+<section>
+  <span class="sec-tag">02 — Prefill engine</span>
+  <h2>The part that justifies custom silicon</h2>
+
+  <p>Decode cannot be made faster by design — it is bandwidth divided by a constant, and any competent chip hits the same number. Prefill is different: it is compute-bound, it scales with the array, and it is the latency a user perceives as "the model is thinking." S1 is built around three mechanisms that a general-purpose NPU does not have.</p>
+
+  <h3>1 — Dual-mode dataflow</h3>
+  <p>Decode and prefill want <em>opposite</em> dataflows. In decode each weight is used exactly once, so the array must be <strong>weight-streaming and output-stationary</strong>. In prefill with a 2048-token chunk each weight is used hundreds of times, which is textbook <strong>weight-stationary systolic</strong> — load a tile once, stream activations through it.</p>
+  <p>S1 implements both on the same PEs, with the batch dimension as a continuum: <strong>1 for decode, 8 for speculative verify, 2048 for prefill.</strong> The cost is roughly 15–20% area over a single-mode array in muxing and dual accumulator paths. The hard constraint is that mode-select logic must sit off decode's critical path — decode is the mode that ships in volume, and it must not pay for prefill's flexibility.</p>
+
+  <h3>2 — Expert-major prefill scheduling</h3>
+  <p>The naive schedule iterates tokens and gathers experts. For a chunk of 512 tokens, essentially all 32 experts are touched in every layer, so the chunk reads the entire 4,649 MB weight set. S1 inverts the loop:</p>
+
+<pre>for layer in 0..23:
+    route all C tokens          # one 2048→32 GEMV per token
+    for expert e in 0..31:
+        load e's weights once   # 5.85 MB, contiguous
+        GEMM against the ~C/8 tokens routed to e</pre>
+
+  <p>Each expert is now read <em>exactly once per chunk per layer</em>, so prefill memory traffic is <code>4,649 MB ÷ chunk</code> and falls linearly as the chunk grows:</p>
+
+  <div class="tw">
+    <table>
+      <caption>Prefill memory vs. chunk size — expert-major schedule</caption>
+      <thead><tr><th class="n">Chunk</th><th class="n">Traffic/token</th><th class="n">vs. decode's 978 MB</th><th class="n">Tokens per expert</th><th class="n">SRAM</th></tr></thead>
+      <tbody>
+        <tr><td class="n">512</td><td class="n">9.08 MB</td><td class="n">0.9%</td><td class="n">64</td><td class="n">5.0 MB</td></tr>
+        <tr><td class="n">1,024</td><td class="n">4.54 MB</td><td class="n">0.5%</td><td class="n">128</td><td class="n">6.1 MB</td></tr>
+        <tr class="hi"><td class="n">2,048</td><td class="n"><strong>2.27 MB</strong></td><td class="n">0.2%</td><td class="n">256</td><td class="n">8.2 MB</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>Array size and chunk size are coupled through the routing</strong>, and this is the least obvious constraint on the chip. A systolic tile of edge <em>T</em> needs ≥<em>T</em> tokens per expert to fill, and tokens-per-expert is <code>chunk ÷ 8</code> at top-4 of 32. Build a 16K-lane array with a 512-token chunk and it runs at 46% occupancy on ragged GEMMs. The 8 MB SRAM is not a luxury — <strong>it is what makes the array usable.</strong></p>
+  <p>Measured occupancy on real routing traces, at chunk 2048:</p>
+  <div class="tw"><table><caption>Systolic occupancy — measured traces, chunk 2048</caption>
+  <thead><tr><th class="n">Sub-tile edge</th><th class="n">32</th><th class="n">64</th><th class="n">96</th><th class="n">128</th></tr></thead>
+  <tbody><tr><td class="n">Occupancy</td><td class="n">0.942</td><td class="n"><strong>0.888</strong></td><td class="n">0.843</td><td class="n">0.805</td></tr></tbody></table></div>
+  <p>This is why the array is <strong>four independent 64×64 sub-tiles rather than one 128×128</strong>. The same 16,384 lanes, but short experts waste a quarter-sized pass instead of a full one: 0.888 against 0.805, at identical die area. A monolithic 128-edge array sits on the 0.80 gate with no margin.</p>
+
+  <p>Routing is also not uniform: some experts receive 20 tokens and others 400. The token-gather scheduler (0.25 mm²) handles ragged batches, packs short GEMMs together, and keeps the systolic array fed across the imbalance. This block is small in area and large in verification effort.</p>
+
+  <h3>3 — A dedicated attention engine, but only above 8K</h3>
+  <p>Attention is quadratic and everything else is linear, so its share of prefill grows with prompt length:</p>
+
+  <div class="tw">
+    <table>
+      <caption>Prefill cost structure — LFM2.5-8B-A1B</caption>
+      <thead><tr><th class="n">Prompt</th><th class="n">Linear</th><th class="n">Attention</th><th class="n">Attention share</th></tr></thead>
+      <tbody>
+        <tr><td class="n">512</td><td class="n">1.7 TOP</td><td class="n">0.0 TOP</td><td class="n">1%<span class="bar" style="width:1%"></span></td></tr>
+        <tr><td class="n">2,048</td><td class="n">6.9 TOP</td><td class="n">0.2 TOP</td><td class="n">3%<span class="bar" style="width:3%"></span></td></tr>
+        <tr><td class="n">8,192</td><td class="n">27.6 TOP</td><td class="n">3.3 TOP</td><td class="n">11%<span class="bar" style="width:11%"></span></td></tr>
+        <tr><td class="n">32,768</td><td class="n">110.5 TOP</td><td class="n">52.8 TOP</td><td class="n">32%<span class="bar" style="width:32%"></span></td></tr>
+        <tr><td class="n">131,072</td><td class="n">441.9 TOP</td><td class="n">844.4 TOP</td><td class="n">66%<span class="bar" style="width:66%"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>A tiled flash-attention engine with a hardware exponential and running max/sum costs 0.8 mm² and runs QK<sup>T</sup>/PV about 2.5× more efficiently than the general array. Below 8K it is nearly idle; above 32K it is the difference between usable and not. Having only six attention layers — a property of the model, not the chip — is what keeps this affordable at all.</p>
+
+  <h3>Array sizing: where the knee is</h3>
+  <div class="tw">
+    <table>
+      <caption>Array size vs. TTFT at a 2,048-token prompt</caption>
+      <thead><tr><th class="n">MACs</th><th class="n">TOPS</th><th class="n">Array area</th><th class="n">TTFT</th><th class="n">Min chunk</th></tr></thead>
+      <tbody>
+        <tr><td class="n">4,096</td><td class="n">8.2</td><td class="n">1.4 mm²</td><td class="n">868 ms</td><td class="n">512</td></tr>
+        <tr><td class="n">8,192</td><td class="n">16.4</td><td class="n">2.9 mm²</td><td class="n">434 ms</td><td class="n">720</td></tr>
+        <tr class="hi"><td class="n">16,384</td><td class="n">32.8</td><td class="n"><strong>5.7 mm²</strong></td><td class="n"><strong>213 ms</strong></td><td class="n">1,024</td></tr>
+        <tr><td class="n">32,768</td><td class="n">65.5</td><td class="n">11.5 mm²</td><td class="n">108 ms</td><td class="n">1,448</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>16,384 lanes is the knee. Doubling again costs 5.8 mm² — 28% of the die — to save 105 ms that no user perceives. S1 stops there.</p>
+</section>
+
+<section>
+  <span class="sec-tag">03 — Latency</span>
+  <h2>Time to first token</h2>
+
+  <div class="tw">
+    <table>
+      <caption>TTFT — SKU B, 32.8 TOPS, 2,048-token chunks, attention engine active</caption>
+      <thead><tr><th class="n">Prompt</th><th class="n">8B-A1B</th><th class="n">@ 1.4 GHz boost</th><th class="n">2.6B dense</th><th>Bound by</th></tr></thead>
+      <tbody>
+        <tr><td class="n">128</td><td class="n">66 ms</td><td class="n">47 ms</td><td class="n">21 ms</td><td>memory — one full expert sweep</td></tr>
+        <tr><td class="n">512</td><td class="n">66 ms</td><td class="n">47 ms</td><td class="n">84 ms</td><td>memory</td></tr>
+        <tr class="hi"><td class="n">2,048</td><td class="n"><strong>213 ms</strong></td><td class="n">152 ms</td><td class="n">339 ms</td><td>compute</td></tr>
+        <tr><td class="n">8,192</td><td class="n">882 ms</td><td class="n">630 ms</td><td class="n">1,408 ms</td><td>compute + 11% attention</td></tr>
+        <tr><td class="n">32,768</td><td class="n">4.0 s</td><td class="n">2.9 s</td><td class="n">6.4 s</td><td>compute + 32% attention</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>A 2K prompt answers in 213 ms — below the ~250 ms threshold where an interface stops feeling like it is waiting. Note the crossover at short prompts: the dense 2.6B is <em>faster</em> below ~512 tokens because the MoE must sweep all 32 experts regardless of how few tokens it is processing, while above 2K the MoE wins because only 1.69 B parameters are active. <strong>The firmware should pick the model by prompt length</strong> where both are resident — a scheduling decision, not a hardware one.</p>
+
+  <p>Long prompts remain the weak spot and the plan says so rather than hiding it. 32K takes 4 seconds, and 128K is not a supported interactive mode. Three mitigations, all sized at P1 rather than discovered at P3:</p>
+  <ul>
+    <li><strong>Prefix KV caching</strong> — persist and reuse the KV for a stable system prompt or document, turning the common repeat-query case into a near-zero TTFT.</li>
+    <li><strong>Overlapped streaming prefill</strong> — begin emitting tokens before the whole prompt is consumed, where the application allows it.</li>
+    <li><strong>Honest per-SKU context limits</strong> — publish the TTFT curve instead of quietly degrading.</li>
+  </ul>
+
+  <p>Prefill burst power is ~2.9 W: 1.6 W of array plus ~0.9 W of memory plus SRAM traffic. It lasts 213 ms, and it is <em>below</em> decode's 3.8 W because compute-bound operation only runs the memory system at ~21 GB/s. The boost DVFS point exists to spend exactly this headroom.</p>
+</section>
+
+<section>
+  <span class="sec-tag">04 — Floorplan</span>
+  <h2>Die</h2>
+
+  <figure class="bleed">
+    <svg class="plan" viewBox="0 0 1000 560" role="img" aria-label="Block diagram of the Sonic S1 die: LPDDR5X PHY and memory controller feed a weight streamer with expert gather into a 16,384-lane dual-mode systolic array; a MoE router, token-gather scheduler, flash-attention engine, short-conv, vector and LM-head units surround it, with a programmable vector unit as an escape hatch and a RISC-V sequencer in control.">
+      <defs>
+        <style>
+          .lbl-s{font-family:"IBM Plex Mono",monospace;font-size:9.5px;fill:var(--muted)}
+          .lbl-t{font-family:"IBM Plex Sans Condensed",sans-serif;font-size:13.5px;font-weight:600;fill:var(--ink)}
+          .blk{fill:var(--surface-2);stroke:var(--rule-strong);stroke-width:1}
+          .blk-a{fill:var(--copper-soft);stroke:var(--copper);stroke-width:1.5}
+          .blk-b{fill:var(--teal-soft);stroke:var(--teal);stroke-width:1.2}
+          .wire{stroke:var(--rule-strong);stroke-width:1.4;fill:none}
+          .wire-hot{stroke:var(--copper);stroke-width:2.4;fill:none}
+          .die{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-dasharray:6 4}
+        </style>
+        <marker id="ah" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="var(--rule-strong)"/></marker>
+        <marker id="ahh" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 z" fill="var(--copper)"/></marker>
+      </defs>
+
+      <rect class="die" x="10" y="10" width="980" height="540"/>
+      <text class="lbl-s" x="20" y="30">SONIC S1 — 20.56 mm² @ 14 nm LPP — 4.53 mm square</text>
+
+      <rect class="blk" x="28" y="56" width="106" height="306"/>
+      <text class="lbl-t" x="38" y="82">LPDDR5X</text><text class="lbl-t" x="38" y="99">PHY ×64</text>
+      <text class="lbl-s" x="38" y="120">68.3 GB/s</text><text class="lbl-s" x="38" y="134">2.09 mm²</text>
+      <text class="lbl-s" x="38" y="156">licensed</text><text class="lbl-s" x="38" y="170">hard IP</text>
+      <text class="lbl-s" x="38" y="192">×32 / ×128</text><text class="lbl-s" x="38" y="206">variants</text>
+
+      <rect class="blk" x="158" y="56" width="104" height="146"/>
+      <text class="lbl-t" x="168" y="82">Memory ctrl</text>
+      <text class="lbl-s" x="168" y="102">16 outstanding</text><text class="lbl-s" x="168" y="116">stream queues</text>
+      <text class="lbl-s" x="168" y="130">bank-aware</text><text class="lbl-s" x="168" y="144">reorder</text>
+      <text class="lbl-s" x="168" y="166">expert prefetch</text><text class="lbl-s" x="168" y="180">one layer ahead</text>
+
+      <rect class="blk" x="158" y="222" width="104" height="140"/>
+      <text class="lbl-t" x="168" y="248">KV + state</text><text class="lbl-t" x="168" y="265">DMA</text>
+      <text class="lbl-s" x="168" y="286">6 KB/token</text><text class="lbl-s" x="168" y="300">INT8 KV</text>
+      <text class="lbl-s" x="168" y="314">paged; INT4</text><text class="lbl-s" x="168" y="328">above 32K</text>
+
+      <rect class="blk-a" x="286" y="56" width="150" height="146"/>
+      <text class="lbl-t" x="297" y="82">Weight streamer</text>
+      <text class="lbl-s" x="297" y="101">INT4 g=64 → INT8</text>
+      <text class="lbl-s" x="297" y="115">inline AES-256</text>
+      <text class="lbl-s" x="297" y="136">EXPERT GATHER</text>
+      <text class="lbl-s" x="297" y="150">indirect descriptors</text>
+      <text class="lbl-s" x="297" y="164">5.85 MB contiguous</text>
+      <text class="lbl-s" x="297" y="178">— sequential bursts</text>
+
+      <rect class="blk" x="286" y="222" width="150" height="140"/>
+      <text class="lbl-t" x="297" y="248">Unified SRAM</text>
+      <text class="lbl-s" x="297" y="268">8 MB, 16 banks</text>
+      <text class="lbl-s" x="297" y="286">— prefill chunk 4.2 MB</text>
+      <text class="lbl-s" x="297" y="300">— expert staging</text>
+      <text class="lbl-s" x="297" y="314">— conv state 72 KB</text>
+      <text class="lbl-s" x="297" y="328">— KV hot window</text>
+
+      <rect class="blk-a" x="286" y="382" width="150" height="88"/>
+      <text class="lbl-t" x="297" y="404">Router + gather</text>
+      <text class="lbl-s" x="297" y="423">2048→32 GEMV, bias,</text>
+      <text class="lbl-s" x="297" y="437">top-4, renorm</text>
+      <text class="lbl-s" x="297" y="455">ragged-GEMM packer</text>
+
+      <rect class="blk-a" x="468" y="56" width="196" height="414"/>
+      <text class="lbl-t" x="480" y="82">Dual-mode array</text>
+      <text class="lbl-s" x="480" y="103">4 × 64² sub-tiles</text>
+      <text class="lbl-s" x="480" y="117">16,384 MAC @ 1 GHz</text>
+      <text class="lbl-s" x="480" y="131">32.8 TOPS · 5.73 mm²</text>
+      <text class="lbl-s" x="480" y="154">DECODE MODE</text>
+      <text class="lbl-s" x="480" y="168">weight-streaming,</text>
+      <text class="lbl-s" x="480" y="182">output-stationary,</text>
+      <text class="lbl-s" x="480" y="196">8 accum banks, batch 1–8</text>
+      <text class="lbl-s" x="480" y="218">PREFILL MODE</text>
+      <text class="lbl-s" x="480" y="232">weight-stationary,</text>
+      <text class="lbl-s" x="480" y="246">activations stream,</text>
+      <text class="lbl-s" x="480" y="260">batch up to 2048</text>
+      <text class="lbl-s" x="480" y="283">hierarchical accum</text>
+      <text class="lbl-s" x="480" y="297">16b → fold 16 → 24b → 32b</text>
+      <text class="lbl-s" x="480" y="319">3% utilised in decode</text>
+      <text class="lbl-s" x="480" y="333">— power-gated</text>
+      <g>
+        <rect x="480" y="352" width="170" height="102" fill="none" stroke="var(--copper)" stroke-width="1" opacity=".5"/>
+        <g stroke="var(--copper)" stroke-width=".7" opacity=".33">
+          <line x1="480" y1="377.5" x2="650" y2="377.5"/><line x1="480" y1="403" x2="650" y2="403"/><line x1="480" y1="428.5" x2="650" y2="428.5"/>
+          <line x1="501.2" y1="352" x2="501.2" y2="454"/><line x1="522.5" y1="352" x2="522.5" y2="454"/><line x1="543.7" y1="352" x2="543.7" y2="454"/>
+          <line x1="565" y1="352" x2="565" y2="454"/><line x1="586.2" y1="352" x2="586.2" y2="454"/><line x1="607.5" y1="352" x2="607.5" y2="454"/><line x1="628.7" y1="352" x2="628.7" y2="454"/>
+        </g>
+      </g>
+
+      <rect class="blk-a" x="696" y="56" width="128" height="90"/>
+      <text class="lbl-t" x="707" y="79">Attention engine</text>
+      <text class="lbl-s" x="707" y="98">tiled flash decode</text>
+      <text class="lbl-s" x="707" y="112">HW exp, running max</text>
+      <text class="lbl-s" x="707" y="126">RoPE CORDIC, θ reg</text>
+      <text class="lbl-s" x="707" y="140">GQA 32q/8kv · 0.80 mm²</text>
+
+      <rect class="blk-b" x="696" y="166" width="128" height="82"/>
+      <text class="lbl-t" x="707" y="189">Vector unit</text>
+      <text class="lbl-s" x="707" y="207">RMSNorm, SwiGLU</text>
+      <text class="lbl-s" x="707" y="221">loadable 16-seg PWL</text>
+      <text class="lbl-s" x="707" y="235">requant, residual</text>
+
+      <rect class="blk-b" x="696" y="268" width="128" height="82"/>
+      <text class="lbl-t" x="707" y="291">Short-conv unit</text>
+      <text class="lbl-s" x="707" y="309">k ≤ 7 depthwise causal</text>
+      <text class="lbl-s" x="707" y="323">B/C double gate</text>
+      <text class="lbl-s" x="707" y="337">state resident on die</text>
+
+      <rect class="blk-a" x="696" y="370" width="128" height="100"/>
+      <text class="lbl-t" x="707" y="393">Programmable</text><text class="lbl-t" x="707" y="409">vector unit</text>
+      <text class="lbl-s" x="707" y="428">RVV escape hatch</text>
+      <text class="lbl-s" x="707" y="442">1.50 mm² — §10</text>
+      <text class="lbl-s" x="707" y="460">covers unknown ops</text>
+
+      <rect class="blk-a" x="856" y="56" width="114" height="180"/>
+      <text class="lbl-t" x="867" y="80">LM head unit</text>
+      <text class="lbl-s" x="867" y="100">128K vocab — 15.5%</text>
+      <text class="lbl-s" x="867" y="114">of all decode traffic</text>
+      <text class="lbl-s" x="867" y="136">streaming top-k(64)</text>
+      <text class="lbl-s" x="867" y="150">clustered pruning</text>
+      <text class="lbl-s" x="867" y="164">hardware sampler</text>
+      <text class="lbl-s" x="867" y="186">no logit vector ever</text>
+      <text class="lbl-s" x="867" y="200">crosses to the host</text>
+      <text class="lbl-s" x="867" y="221">0.14 mm² → ~8% BW</text>
+
+      <rect class="blk" x="856" y="256" width="114" height="106"/>
+      <text class="lbl-t" x="867" y="280">RV32IMC</text>
+      <text class="lbl-s" x="867" y="299">sequencer</text>
+      <text class="lbl-s" x="867" y="313">descriptor ring</text>
+      <text class="lbl-s" x="867" y="327">model select by</text>
+      <text class="lbl-s" x="867" y="341">prompt length</text>
+      <text class="lbl-s" x="867" y="355">64 KB I$</text>
+
+      <rect class="blk" x="28" y="490" width="942" height="48"/>
+      <text class="lbl-t" x="40" y="510">Chip infrastructure</text>
+      <text class="lbl-s" x="40" y="528">AXI4 NoC (weight-stream + control rings) · per-unit DVFS islands, 1.4 GHz prefill boost · JTAG, MBIST, scan · PVT ring oscillators · SPI/I3C host mailbox · array and streamer gate together</text>
+
+      <path class="wire-hot" d="M134,114 L158,114" marker-end="url(#ahh)"/>
+      <path class="wire-hot" d="M262,114 L286,114" marker-end="url(#ahh)"/>
+      <path class="wire-hot" d="M436,124 L468,124" marker-end="url(#ahh)"/>
+      <path class="wire" d="M134,284 L158,284" marker-end="url(#ah)"/>
+      <path class="wire" d="M262,292 L286,292" marker-end="url(#ah)"/>
+      <path class="wire" d="M436,292 L468,292" marker-end="url(#ah)"/>
+      <path class="wire" d="M436,420 C452,420 452,380 468,380" marker-end="url(#ah)"/>
+      <path class="wire" d="M361,382 L361,364" marker-end="url(#ah)"/>
+      <path class="wire" d="M664,101 L696,101" marker-end="url(#ah)"/>
+      <path class="wire" d="M664,207 L696,207" marker-end="url(#ah)"/>
+      <path class="wire" d="M664,309 L696,309" marker-end="url(#ah)"/>
+      <path class="wire" d="M664,410 L696,410" marker-end="url(#ah)"/>
+      <path class="wire" d="M824,101 L856,101" marker-end="url(#ah)"/>
+      <path class="wire" d="M913,236 L913,256" marker-end="url(#ah)"/>
+      <path class="wire" d="M760,146 L760,164" marker-end="url(#ah)"/>
+      <path class="wire" d="M760,248 L760,266" marker-end="url(#ah)"/>
+    </svg>
+    <figcaption>Copper blocks sit on the per-token critical path or exist to serve prefill; teal blocks are correctness-critical but sized for convenience. The thick copper wire is the weight stream — if it stalls, the chip stops. The array is the largest logic block on the die and is idle for 97% of a decode session, by design.</figcaption>
+  </figure>
+
+  <div class="tw">
+    <table>
+      <caption>Area budget — 14 nm LPP</caption>
+      <thead><tr><th>Block</th><th class="n">Area</th><th class="n">Share</th><th>Note</th></tr></thead>
+      <tbody>
+        <tr><td>8 MB SRAM, 16 banks</td><td class="n">6.40 mm²</td><td class="n">31.1%<span class="bar" style="width:31.1%"></span></td><td>hard macros; what makes the array usable</td></tr>
+        <tr><td>16,384-lane dual-mode array</td><td class="n">5.73 mm²</td><td class="n">27.9%<span class="bar" style="width:27.9%"></span></td><td>bought entirely for TTFT</td></tr>
+        <tr><td>LPDDR5X ×64 PHY</td><td class="n">2.09 mm²</td><td class="n">10.2%<span class="bar" style="width:10.2%"></span></td><td>licensed IP, barely scales with node</td></tr>
+        <tr><td>Programmable vector unit</td><td class="n">1.50 mm²</td><td class="n">7.3%<span class="bar d" style="width:7.3%"></span></td><td>architecture insurance — §10</td></tr>
+        <tr><td>Flash-attention engine</td><td class="n">0.80 mm²</td><td class="n">3.9%<span class="bar" style="width:3.9%"></span></td><td>earns its keep above 8K context</td></tr>
+        <tr><td>Streamer + expert gather + dequant + AES</td><td class="n">0.45 mm²</td><td class="n">2.2%<span class="bar" style="width:2.2%"></span></td><td></td></tr>
+        <tr><td>Conv + vector units</td><td class="n">0.43 mm²</td><td class="n">2.1%<span class="bar" style="width:2.1%"></span></td><td>2048-wide datapaths</td></tr>
+        <tr><td>IO ring / ESD</td><td class="n">0.40 mm²</td><td class="n">1.9%<span class="bar d" style="width:1.9%"></span></td><td>does not scale at all</td></tr>
+        <tr><td>PLLs, LDOs, PVT monitors</td><td class="n">0.33 mm²</td><td class="n">1.6%<span class="bar d" style="width:1.6%"></span></td><td></td></tr>
+        <tr><td>RV32 + NoC + DFT</td><td class="n">0.29 mm²</td><td class="n">1.4%<span class="bar" style="width:1.4%"></span></td><td></td></tr>
+        <tr><td>Token-gather / ragged-GEMM scheduler</td><td class="n">0.25 mm²</td><td class="n">1.2%<span class="bar" style="width:1.2%"></span></td><td>small area, large DV effort</td></tr>
+        <tr><td>LM head + sampler</td><td class="n">0.14 mm²</td><td class="n">0.7%<span class="bar" style="width:0.7%"></span></td><td>saves ~8% of decode traffic</td></tr>
+        <tr><td>MoE router + top-k</td><td class="n">0.05 mm²</td><td class="n">0.2%<span class="bar" style="width:0.2%"></span></td><td>gates 57.5% of the traffic</td></tr>
+        <tr><td>Routing / utilisation @ 65%</td><td class="n">1.70 mm²</td><td class="n">8.3%</td><td></td></tr>
+        <tr class="total"><td>Total die</td><td class="n">20.56 mm²</td><td class="n">0.206 cm²</td><td>4.53 mm square</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note good">
+    <span class="lbl">A side benefit worth naming</span>
+    <p>A ×64 LPDDR5X interface plus power and ground is ~614 bumps, which needs ≥9.9 mm² of die at 110 µm fine-pitch C4 and ≥18.4 mm² at conventional 150 µm. At 20.6 mm² <strong>S1 is no longer bump-limited</strong> — it can use standard flip-chip packaging rather than requiring fine-pitch InFO. The prefill array partly pays for itself in package cost.</p>
+  </div>
+
+  <h3>Node</h3>
+  <p>14 nm LPP. The same design is roughly 36 mm² at 22 nm ULL; silicon cost is nearly a wash ($2.01/die at 14 nm on a $6,000 wafer against ~$1.90 at 22 nm on a $3,500 wafer) and 14 nm adds ~$4 M of mask cost. It wins on the two things that matter here: ~30% lower core power on a battery product, and enough density that the 16K-lane array is affordable at all. At 22 nm the array alone would be 11.5 mm² and the prefill story would not close.</p>
+</section>
+
+<section>
+  <span class="sec-tag">05 — Decode</span>
+  <h2>Throughput, and an honest word on speculation</h2>
+
+  <div class="tw">
+    <table>
+      <caption>SKU ladder — decode, both models</caption>
+      <thead><tr><th>SKU</th><th>Memory</th><th class="n">BW</th><th class="n">8B-A1B</th><th class="n">+DSpark</th><th class="n">2.6B</th><th class="n">+spec</th><th class="n">Power</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>A — Wearable</strong><br><span class="sub">watch, earbud hub</span></td>
+          <td>×32 LPDDR5X<br><span class="sub">8 GB</span></td>
+          <td class="n">25.6 GB/s</td><td class="n">26 t/s</td><td class="n">41</td><td class="n">17 t/s</td><td class="n">38</td><td class="n">2.1 W</td>
+        </tr>
+        <tr class="hi">
+          <td><strong>B — Handheld</strong><br><span class="sub">phone co-processor; volume part</span></td>
+          <td>×64 LPDDR5X<br><span class="sub">8 GB</span></td>
+          <td class="n">68.3 GB/s</td><td class="n"><strong>68 t/s</strong></td><td class="n">110</td><td class="n">45 t/s</td><td class="n">103</td><td class="n">3.7 W</td>
+        </tr>
+        <tr>
+          <td><strong>C — Edge / robotics</strong><br><span class="sub">kiosk, vehicle, dev board</span></td>
+          <td>×128 LPDDR5X<br><span class="sub">8 GB</span></td>
+          <td class="n">136.5 GB/s</td><td class="n">136 t/s</td><td class="n">219</td><td class="n">91 t/s</td><td class="n">205</td><td class="n">6.4 W</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Speculative decoding works on the dense model and barely works on the MoE</h3>
+  <p>Liquid ships <strong>LFM2.5-8B-A1B-DSpark</strong>, a 328 M drafter, and publishes "~2.5× faster decoding with identical outputs". That figure is real and it does not transfer to S1 unchanged, because the two numbers measure different bottlenecks.</p><p>Its <code>config.json</code> matters: <code>block_size = 9</code> and a <code>dflash_config</code> naming five <code>target_layer_ids</code>, so it emits a whole block of nine candidates in <em>one</em> pass while consuming the target's intermediate hidden states — not nine sequential passes. And at 327.7 M parameters against a 274.5 M body, it carries no vocab table of its own; the 128K × 2048 embedding is shared with the target. Both facts make it far cheaper than a naive drafter.</p><p>The MoE still erodes it. On a GPU, batch-1 decode is largely latency-bound — many small kernel launches against weights already in HBM — so speculation wins by collapsing nine launches into one. On S1 decode is purely bandwidth-bound, so speculation only helps if it moves fewer <em>bytes</em>. On a dense model it does, exactly. On an MoE a verify batch routes to many more experts than a single token, so much of the reuse is lost.</p>
+  <p><strong>How much is lost is a measurement, not a derivation, and the difference is large.</strong> An independent-uniform-routing model predicts a batch of ten touches 23.6 of 32 experts. Traces captured from the real model — 16,104 routing decisions across all 22 MoE layers, see <code>p3/capture_routing.py</code> — show <strong>14.7</strong>. Real sequences reuse experts; the uniform model assumes they do not, and understates the speculative gain by about 40%. Measured expert-load CV is 0.163 globally, so the aux-loss-free expert-bias balancing is working well.</p>
+
+  <div class="tw">
+    <table>
+      <caption>DSpark on S1 — measured routing, block 9, INT8 drafter</caption>
+      <thead><tr><th class="n">Acceptance p</th><th class="n">Experts touched</th><th class="n">Verify</th><th class="n">E[accepted]</th><th class="n">MB/token</th><th class="n">Gain</th><th class="n">Uniform bound</th></tr></thead>
+      <tbody>
+        <tr><td class="n">0.70</td><td class="n">14.7 / 32</td><td class="n">2,377 MB</td><td class="n">3.24</td><td class="n">835</td><td class="n">1.17×</td><td class="n">0.82×</td></tr>
+        <tr class="hi"><td class="n">0.80</td><td class="n">14.7 / 32</td><td class="n">2,377 MB</td><td class="n">4.46</td><td class="n">606</td><td class="n"><strong>1.61×</strong></td><td class="n">1.13×</td></tr>
+        <tr><td class="n">0.90</td><td class="n">14.7 / 32</td><td class="n">2,377 MB</td><td class="n">6.51</td><td class="n">415</td><td class="n">2.36×</td><td class="n">1.64×</td></tr>
+        <tr><td class="n" colspan="4">Dense 2.6B for comparison, chain k = 4, p = 0.80</td><td class="n">631</td><td class="n">2.26×</td><td class="n">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>So: <strong>budget 1.6× at 80% acceptance, rising to 2.4× at 90%.</strong> Liquid's published ~2.5× is within reach on S1 at high acceptance — it is not the ~1.1× the uniform bound suggested, and it is not free either. The remaining unknown is the acceptance rate itself on representative workloads, which needs the drafter checkpoint and is the last open P0 item. DSpark is lossless, so it costs nothing in quality; ship it, but keep the SKU table's headline on solo decode.</p><p><strong>What the drafter demands of the hardware</strong>, all of which must be in the P2 RTL rather than discovered at P3: a hidden-state tap at target layers 2, 6, 10, 14 and 18 staged in SRAM (~102 KB at block 9); a second KV cache for the drafter's five dense attention layers, at 5.1 KB/token on top of the target's 6.14 — nearly doubling KV; 328 MB of resident drafter weights; mask token 125017 in the sampler path; a dynamic verify batch, because the confidence head varies the block length; and a <em>second</em> RoPE style, since the drafter sets <code>rope_is_neox_style = false</code>.</p>
+
+  <div class="note good">
+    <span class="lbl">Where MoE does pay enormously</span>
+    <p>True concurrent batching — where every token is real rather than probabilistic — amortizes exactly as advertised: 2.3× at batch 8, 6.4× at batch 32, 25.5× at batch 128 (140 MB and 35 MB per token respectively). <strong>MoE is fundamentally a server-shaped architecture</strong> that happens to also beat dense by 1.6× at batch 1. If a multi-user SKU is ever on the roadmap, this is where its economics come from.</p>
+  </div>
+</section>
+
+<section>
+  <span class="sec-tag">06 — Co-design</span>
+  <h2>Model changes that would pay for themselves in silicon</h2>
+
+  <p>S1 runs both published models unmodified. But the program has a rare advantage — the model and the chip can be specified together — and a handful of changes to the next LFM would buy more than any RTL optimization on this die. Listed by return.</p>
+
+  <h4>1 — Convert three of six attention layers to sliding-window</h4>
+  <p>The quadratic term is 32% of prefill at 32K and 66% at 128K, and it is the sole reason long-context TTFT is unshippable. Halving the number of full-attention layers roughly halves both the quadratic term and the KV cache. <strong>32K TTFT drops from 4.0 s to ~2.7 s, KV at 128K drops from 805 MB to ~400 MB.</strong> The conv layers already carry local mixing, so the quality cost should be small — this is the highest-value change on the list.</p>
+
+  <h4>2 — Add a shared always-on expert</h4>
+  <p>Replace top-4-of-32 with one shared expert plus top-3 routed. The shared expert is dense, perfectly predictable traffic that can be prefetched a layer ahead and streamed sequentially, while the routed union shrinks. It moves bandwidth from the unpredictable gather path to the predictable stream path — the single most valuable thing you can do for a memory controller — and it slightly improves speculation, since part of every token's feed-forward is now shared across the verify batch.</p>
+
+  <h4>3 — Factorize the LM head</h4>
+  <p>The tied 128,000 × 2048 head is 15.5% of decode traffic — 139 MB read every token to produce one sampled ID. A low-rank factorization (2048 → 512 → 128K) or a 256-way cluster hierarchy would cut that to ~2%, worth <strong>~13% end-to-end decode throughput</strong> for a modest quality cost. S1's LM-head unit already implements clustered pruning in hardware; a model trained for it would let the chip use the exact path rather than a bounded approximation.</p>
+
+  <h4>4 — Train for routing stability</h4>
+  <p>Add a loss term rewarding adjacent tokens for reusing experts. Every number in §05 improves: speculative gain, batching efficiency, and DRAM row locality on the gather path. This is a pure training-side change with no inference cost and no quality target of its own — and it is invisible to anyone who is not building the hardware.</p>
+
+  <h4>5 — Keep every dimension a multiple of the systolic tile</h4>
+  <p>Both current models already comply: 2048 = 16×128, 1792 = 14×128, 7168 = 56×128, 10752 = 84×128. Make it an explicit constraint rather than a happy accident, and pin the systolic tile edge at 128 so the model team has a fixed number to design against. A future <code>moe_intermediate_size</code> of, say, 1800 would cost 4% of the array to padding for no benefit.</p>
+
+  <h4>6 — Widen the conv kernel before adding attention layers</h4>
+  <p>Short conv is O(P) and nearly free on this chip — three cycles per layer per token, with state resident on die. Attention is quadratic and expensive. If the next model needs more mixing capacity, taking it from a 5- or 7-tap conv rather than a seventh attention layer is close to free in silicon. S1's conv unit already supports up to 7 taps for exactly this reason.</p>
+
+  <div class="note">
+    <span class="lbl">The one that would change the die</span>
+    <p>Everything above is a model change that S1 already accommodates. The one change that would justify a new floorplan is <strong>fewer, larger experts</strong> — say 8 experts top-1 at 4× the width. The sparsity ratio and therefore the bandwidth are identical, but each expert becomes a 23 MB contiguous read instead of 5.85 MB, DRAM efficiency improves, routing decisions drop 4×, and the ragged-GEMM scheduler becomes far simpler. Worth modelling at P1 before the model team freezes the next architecture.</p>
+  </div>
+</section>
+
+<section>
+  <span class="sec-tag">07 — Numerics</span>
+  <h2>Quantization sets the bandwidth, and the bandwidth is the product</h2>
+
+  <p>Bit width is the highest-leverage decision on the program, so the recipe is frozen bit-exactly in a golden model before RTL starts. MoE adds one wrinkle: expert weights are individually less redundant than dense feed-forward weights, so INT4 transferring cleanly from the 2.6B needs testing, not assuming.</p>
+
+  <div class="tw">
+    <table>
+      <caption>Format assignment</caption>
+      <thead><tr><th>Tensor</th><th>Format</th><th>Rationale</th></tr></thead>
+      <tbody>
+        <tr><td>Expert <code>w1</code>, <code>w3</code></td><td class="n">INT4, group 64</td><td>57.5% of traffic; must be 4-bit or the product doesn't exist</td></tr>
+        <tr><td>Expert <code>w2</code> (down-proj)</td><td class="n">INT4, outlier rows INT8</td><td>down-projections are the classic accuracy cliff; ~2% row budget</td></tr>
+        <tr><td>Dense FFN (layers 0–1)</td><td class="n">INT8</td><td>5.2% of traffic and the first layers matter most</td></tr>
+        <tr><td>Router weights + bias</td><td class="n">BF16</td><td>1.4 M params; a routing error wastes a whole expert of bandwidth</td></tr>
+        <tr><td>Conv <code>in_proj</code> / <code>out_proj</code></td><td class="n">INT4 g=64</td><td>verify per layer</td></tr>
+        <tr><td>Conv kernels</td><td class="n">INT8</td><td>6,144 values/layer — quantizing buys nothing, risks state drift</td></tr>
+        <tr><td>Attention Q/K/V/O</td><td class="n">INT8</td><td>3.7% of traffic; nearly free accuracy</td></tr>
+        <tr><td>Embedding / LM head</td><td class="n">INT4, first 4K rows INT8</td><td>frequent tokens carry the perplexity</td></tr>
+        <tr><td>Activations</td><td class="n">INT8, per-token dynamic</td><td>SmoothQuant-style migration into weights, offline</td></tr>
+        <tr><td>Accumulators</td><td class="n">16b → 24b → 32b</td><td>hierarchical; 12b is <em>not</em> legal for INT4 × INT8 at fold 16 — the bound is 16 × 8 × 128 = 16,384</td></tr>
+        <tr><td>Norms, gates, softmax, residual</td><td class="n">BF16</td><td>tiny cost, removes a class of debugging</td></tr>
+        <tr><td>KV cache</td><td class="n">INT8 / INT4 above 32K</td><td>per-head scale; K more sensitive than V</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>Acceptance gate:</strong> ≤ 0.15 perplexity increase versus BF16 on WikiText-2 and a held-out instruction set, ≤ 1.5 points on the published benchmark suite, ≥ 99% top-1 agreement on greedy decode over 10K prompts, and — specific to MoE — <strong>≥ 99.5% routing agreement with the BF16 model</strong>. Routing divergence is a failure mode dense models don't have: a mis-routed token produces plausible output from the wrong expert, which no perplexity check reliably catches.</p>
+</section>
+
+<section>
+  <span class="sec-tag">08 — Memory &amp; energy</span>
+  <h2>Context, watts, and the module</h2>
+
+  <div class="tw">
+    <table>
+      <caption>Decode vs. context — SKU B, INT8 KV</caption>
+      <thead><tr><th class="n">Context</th><th class="n">KV resident</th><th class="n">Total/token</th><th class="n">tok/s</th></tr></thead>
+      <tbody>
+        <tr><td class="n">4 K</td><td class="n">25 MB</td><td class="n">1,003 MB</td><td class="n">68.1</td></tr>
+        <tr><td class="n">32 K</td><td class="n">201 MB</td><td class="n">1,179 MB</td><td class="n">57.9</td></tr>
+        <tr><td class="n">128 K</td><td class="n">805 MB</td><td class="n">1,783 MB</td><td class="n">38.3</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Six attention layers make long context materially cheaper than on a conventional transformer: 128K costs 805 MB of KV and holds 38 tok/s. With 4.6 GB of weights plus 0.8 GB of KV, a full 128K session fits comfortably in an 8 GB part.</p>
+
+  <div class="tw">
+    <table>
+      <caption>Power — SKU B decode at 68 tok/s</caption>
+      <thead><tr><th>Source</th><th class="n">Power</th><th class="n">Share</th><th>Basis</th></tr></thead>
+      <tbody>
+        <tr><td>LPDDR5X I/O + DRAM core</td><td class="n">2.73 W</td><td class="n">72%<span class="bar" style="width:72%"></span></td><td>68.3 GB/s × 8 × 5 pJ/bit</td></tr>
+        <tr><td>Leakage, clocks, NoC</td><td class="n">0.55 W</td><td class="n">15%<span class="bar" style="width:15%"></span></td><td>array power-gated</td></tr>
+        <tr><td>Streamer, dequant, AES</td><td class="n">0.30 W</td><td class="n">8%<span class="bar" style="width:8%"></span></td><td>processes the full stream</td></tr>
+        <tr><td>Vector, conv, attention units</td><td class="n">0.20 W</td><td class="n">5%<span class="bar" style="width:5%"></span></td><td></td></tr>
+        <tr><td>MAC array</td><td class="n">0.013 W</td><td class="n">0.3%<span class="bar" style="width:0.3%"></span></td><td>115 G MAC/s × 0.1 pJ — <em>negligible</em></td></tr>
+        <tr class="total"><td>Total</td><td class="n">3.72 W</td><td class="n">55 mJ/token</td><td>4.0 h continuous on a 15 Wh battery</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The array — the largest logic block on the die — consumes 0.3% of decode power. That is the clearest available statement of where engineering attention belongs: the memory interface, the weight image layout, the quantization recipe, and the DRAM scheduler. Note also that energy per token <em>improves</em> with speed (80 mJ at SKU A, 55 at B, 47 at C) because leakage amortizes over more work. Race-to-idle is the correct power policy.</p>
+
+  <h3>The module</h3>
+  <div class="tw">
+    <table>
+      <caption>Silicon and BOM — SKU B, 8 GB</caption>
+      <thead><tr><th>Component</th><th class="n">Silicon</th><th class="n">Share</th><th class="n">BOM @ 1 M</th></tr></thead>
+      <tbody>
+        <tr><td>LPDDR5X 16 Gb × 4</td><td class="n">168.0 mm²</td><td class="n">76.2%<span class="bar" style="width:76.2%"></span></td><td class="n">$18–26</td></tr>
+        <tr><td>UFS weight store (4.6 GB + 328 MB drafter)</td><td class="n">28.0 mm²</td><td class="n">12.7%<span class="bar" style="width:12.7%"></span></td><td class="n">$5–8</td></tr>
+        <tr><td>Sonic S1 die</td><td class="n">20.6 mm²</td><td class="n">9.3%<span class="bar" style="width:9.3%"></span></td><td class="n">$2.01</td></tr>
+        <tr><td>PMIC</td><td class="n">4.0 mm²</td><td class="n">1.8%<span class="bar" style="width:1.8%"></span></td><td class="n">$1.50</td></tr>
+        <tr><td>Substrate + assembly</td><td class="n">—</td><td class="n">—</td><td class="n">$3–5</td></tr>
+        <tr class="total"><td>Total</td><td class="n">220.6 mm²</td><td class="n">S1 = 9.3%</td><td class="n">$30–43</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <dl class="kv">
+    <dt>PoP package</dt><dd>12.5 × 15.0 mm = 1.88 cm², ~1.2 mm tall</dd>
+    <dt>Host link</dt><dd>SPI or I3C — a 2K prompt is 6 KB, a 512-token reply 1.5 KB</dd>
+    <dt>Cold boot</dt><dd>~2.5 s to page 4.6 GB from UFS at ~2 GB/s</dd>
+  </dl>
+
+  <div class="note risk">
+    <span class="lbl">The business question this raises</span>
+    <p>S1 is 9.3% of the module's silicon and ~5% of its BOM; the memory sets both the price and the performance. Standalone, that is a hard product. <strong>The strong version of this program is IP, not a chip:</strong> a phone or robotics SoC vendor integrates the 20.6 mm² block onto their existing die and shares the LPDDR they already ship. Then the marginal cost really is 20.6 mm², the DRAM is free, and the economics work. Decide which business you are in before P4 — it changes the packaging, the DFT strategy, and the deliverable.</p>
+  </div>
+</section>
+
+<section>
+  <span class="sec-tag">09 — Software</span>
+  <h2>The compiler is half the program</h2>
+  <ul>
+    <li><strong>Offline packer</strong> (Python): consumes the HF checkpoint, applies the §07 recipe, clusters the vocab, and emits a signed, AES-encrypted weight image laid out in the order the streamer walks it — DRAM row and bank order, each expert contiguous. Layout alone is worth 10–15% of achievable bandwidth.</li>
+    <li><strong>Static schedule</strong>: a descriptor ring the RV32 core replays per token, with <em>indirect</em> descriptors for expert fetch whose base addresses the router patches at runtime. Emitted by the packer, checked into the firmware image.</li>
+    <li><strong>Prefill scheduler</strong>: chunking, expert-major loop ordering, ragged-GEMM packing, and the decode↔prefill mode switch. The most intricate firmware on the chip and the one that determines whether the array is 90% or 25% occupied.</li>
+    <li><strong>Model selection</strong>: with both models resident, choose by prompt length and quality target — the dense 2.6B is faster below ~512 tokens, the MoE above.</li>
+    <li><strong>Expert prefetch</strong>: issue layer <em>n</em>+1's expert fetches during layer <em>n</em>'s compute so the DRAM pipeline never drains.</li>
+    <li><strong>Runtime</strong>: a small C library and a Linux/RTOS driver exposing an OpenAI-compatible completion API over the mailbox, plus a <code>llama.cpp</code> backend shim so day-one users have a familiar path.</li>
+  </ul>
+</section>
+
+<section>
+  <span class="sec-tag">10 — Flexibility</span>
+  <h2>Three levels of "can it run the next model"</h2>
+
+  <p>S1 running two different architectures on one die is the proof that this works — but only because it was designed in at P0. It cannot be retrofitted.</p>
+
+  <h4>Level 1 — same architecture, new weights</h4>
+  <p>A fine-tune, a v2.6 checkpoint, a domain adaptation. <strong>Free.</strong> The packer regenerates the image; firmware reflashes it and validates the versioned capability manifest on load.</p>
+
+  <h4>Level 2 — same operators, different shapes</h4>
+  <p>The 8B-A1B ↔ 2.6B case, and any future LFM. These are design rules, not features, and they cost ~10–15% on the non-array blocks:</p>
+  <ul>
+    <li>Every dimension arrives in a descriptor. No block may hardcode <code>d = 2048</code>.</li>
+    <li>Datapaths process fixed 128-wide tiles and loop, matching the systolic edge.</li>
+    <li><code>head_dim</code> 32/64/128 configurable; GQA ratio 1–8; conv kernel up to 7 taps.</li>
+    <li>RoPE θ is a register — 5e6 for the MoE, 1e7 for the dense model.</li>
+    <li>The SwiGLU PWL table is firmware-loadable, so SiLU, GELU and ReLU² are the same hardware.</li>
+    <li>Expert count, top-<em>k</em>, shared-expert presence and expert bias all programmable; <code>num_dense_layers</code> is a per-layer descriptor flag.</li>
+    <li>Ship the capacity. 8 GB runs both models; a future 7B dense at INT4 is 3.6 GB and still fits.</li>
+  </ul>
+
+  <h4>Level 3 — a genuinely different architecture</h4>
+  <p>A Mamba-2 SSM, a diffusion LM, something not yet published. Over a 22-month program this is the real risk, and the answer is the 1.50 mm² programmable vector unit. A fully general GEMV/GEMM engine and streamer handle the ~90% of any transformer-family model that is matrix work, while an RVV-class core covers unusual elementwise and small-matrix ops. The conv and attention units become accelerators for the common case rather than the only path, and a new architecture runs at 60–70% of peak instead of not running at all — the difference between a two-year and a five-year product, for 7% of the die.</p>
+</section>
+
+<section>
+  <span class="sec-tag">11 — Verification</span>
+  <h2>Three references, and the model is the testbench</h2>
+
+  <p>The failure mode in accelerator projects is a chip that closes timing and produces subtly wrong tokens. Guard with a layered reference chain, each layer bit-exact to the one above:</p>
+  <ol>
+    <li><strong>PyTorch fake-quant model</strong> — establishes accuracy, produces the acceptance-gate numbers, dumps golden activations and golden routing decisions for every layer of both models.</li>
+    <li><strong>Bit-exact C golden model</strong> — accumulator widths, rounding modes, PWL segments, online-softmax ordering, top-k tie-breaking. This is the spec; the RTL implements it.</li>
+    <li><strong>RTL + cocotb differential harness</strong> — every unit against the C model on random and directed vectors; the full chip on real prompts, comparing per-layer tensors rather than just final tokens.</li>
+    <li><strong>FPGA emulation</strong> (VU19P class) — the whole 8.47 B model with real weights at ~50 MHz, then the 2.6 B on the same bitstream. Non-negotiable: every interesting bug lives in the interaction between DRAM scheduling, expert gather, and a 24-layer sequence.</li>
+  </ol>
+
+  <p>Directed tests for the failures that actually happen: accumulator overflow at every reduction depth; enable signals asserted across two pipeline phases causing double accumulation; SRAM inferred as flip-flops instead of hard macros; the last group of a non-multiple-of-64 reduction; conv state at positions 0, 1, 2; RoPE at position 127,999; KV page-boundary crossing; speculative rollback mid-layer. <strong>Prefill- and MoE-specific:</strong> all 32 experts selected in one chunk; every token routed to the same expert; an expert receiving zero tokens; expert bias driving a routing tie; a router emitting an out-of-range index; the decode↔prefill mode switch mid-layer; a chunk that is not a multiple of the systolic tile; and a 24-hour soak decoding continuously against the C model with routing compared every token.</p>
+</section>
+
+<section>
+  <span class="sec-tag">12 — Execution</span>
+  <h2>Phases and kill gates</h2>
+  <p>Sequenced because each phase's output is genuinely the next one's input: the numerics freeze gates the memory interface, which gates the floorplan, which gates tapeout.</p>
+
+  <ol class="phases">
+    <li><div class="idx">P0</div><div>
+      <h3>Numerics and routing freeze</h3>
+      <p class="dur">Weeks 1–8 · 2 ML engineers</p>
+      <p>Fake-quant sweep over the §07 recipe on both models. Vocab clustering study. Measured expert overlap per batch depth and acceptance-weighted speculative gain on real workloads. Feasibility study on the §06 co-design changes, since the model team needs the answer before their next freeze. Deliverables: frozen format spec, bit-exact C golden model, per-layer accumulator bounds from real activations.</p>
+      <p class="gate"><b>Gate</b> ≤ 0.15 ppl regression at ≤ 4.5 bits average; ≥ 99.5% routing agreement. Miss it and the memory interface widens before anything else is committed.</p>
+    </div></li>
+    <li><div class="idx">P1</div><div>
+      <h3>Architecture model and package decision</h3>
+      <p class="dur">Weeks 5–14 · 2 architects · overlaps P0</p>
+      <p>Cycle-approximate SystemC model with a real LPDDR5X timing model (DRAMsim3). Sweep array width against TTFT, chunk size against SRAM, systolic occupancy against routing imbalance, expert prefetch depth. Model the fewer-larger-experts variant. Settle bump pitch, package technology, and 14 nm versus 22 nm against the measured power model.</p>
+      <p class="gate"><b>Gate</b> ≥ 65 tok/s at 4K context on SKU B; TTFT ≤ 250 ms at a 2K prompt; systolic occupancy ≥ 80% under measured routing imbalance; DRAM efficiency ≥ 85% of peak; defended power estimate.</p>
+    </div></li>
+    <li><div class="idx">P2</div><div>
+      <h3>Unit RTL and automated PPA loop</h3>
+      <p class="dur">Weeks 12–30 · 4–5 RTL engineers</p>
+      <p>Dual-mode array, streamer with expert gather, router and token-gather scheduler, attention engine, conv, vector, LM head, programmable vector unit — each with a cocotb differential bench against the C model, each in an automated Yosys/OpenROAD PPA loop from its first commit. Hierarchical accumulators from the start. SRAM as explicit hard-macro instantiations. Every Level-2 parameterization rule enforced by a lint check, not a convention.</p>
+      <p class="gate"><b>Gate</b> Every unit bit-exact vs. C model; array closes 1 GHz with ≥ 15% slack in both dataflow modes; both models pass on the same RTL.</p>
+    </div></li>
+    <li><div class="idx">P3</div><div>
+      <h3>Integration and FPGA bring-up</h3>
+      <p class="dur">Weeks 26–46 · full team</p>
+      <p>NoC, RV32 sequencer, firmware, descriptor ring, indirect expert fetch, prefill scheduler, mode switching. Port to a VU19P-class board with real DDR. <strong>Run the full 8.47 B model end to end, then the 2.6 B on the same bitstream.</strong> Everything before this is a hypothesis.</p>
+      <p class="gate"><b>Gate</b> Both models generating coherent text on FPGA; per-layer tensors and routing match the C model; measured TTFT within 20% of the P1 model.</p>
+    </div></li>
+    <li><div class="idx">P4</div><div>
+      <h3>Physical design</h3>
+      <p class="dur">Weeks 40–62 · 3 PD engineers + foundry partner</p>
+      <p>Commercial flow on the real PDK. PHY hardening and signal integrity, floorplan, CTS, timing closure across PVT, power grid and IR analysis for the array's burst current, DFT insertion and ATPG, signoff DRC/LVS/antenna.</p>
+      <p class="gate"><b>Gate</b> Clean signoff, ≥ 98% stuck-at coverage, IR drop &lt; 5% VDD under prefill burst, power within 15% of the P1 model.</p>
+    </div></li>
+    <li><div class="idx">P5</div><div>
+      <h3>Tapeout and bring-up</h3>
+      <p class="dur">Weeks 62–96</p>
+      <p>MPW shuttle first if budget is tight, full mask set if not. Test board, characterization across voltage and temperature, silicon-versus-FPGA correlation, firmware tuning against real DRAM behaviour.</p>
+      <p class="gate"><b>Gate</b> Silicon within 10% of FPGA-projected throughput and TTFT at target power. Only then discuss a shrink or a second die.</p>
+    </div></li>
+  </ol>
+
+  <h3>Team and cost</h3>
+  <dl class="kv">
+    <dt>Headcount</dt><dd>14–17 — 2 ML, 2 arch, 5 RTL/DV, 3 PD, 2 firmware, 1 program</dd>
+    <dt>Duration</dt><dd>~22 months to characterized silicon</dd>
+    <dt>EDA + IP</dt><dd>$2.5–4 M — commercial flow, LPDDR5X PHY, SRAM compilers, AES, RVV core</dd>
+    <dt>MPW shuttle</dt><dd>$300–600 K at 14 nm</dd>
+    <dt>Full mask set</dt><dd>$5–8 M at 14 nm</dd>
+    <dt>Payroll</dt><dd>~$9–12 M over the program</dd>
+    <dt>Total to silicon</dt><dd>$17–24 M</dd>
+  </dl>
+</section>
+
+<section>
+  <span class="sec-tag">13 — Risk</span>
+  <h2>What kills this, and when you'd know</h2>
+
+  <div class="tw">
+    <table>
+      <caption>Principal risks</caption>
+      <thead><tr><th>Risk</th><th>Impact</th><th class="n">Detected</th><th>Response</th></tr></thead>
+      <tbody>
+        <tr><td>Routing imbalance starves the systolic array</td><td>16K lanes at 30% occupancy — the prefill story collapses</td><td class="n">P1, wk 14</td><td>Larger chunk (more SRAM), better ragged packing, or push §06 change 2</td></tr>
+        <tr><td>INT4 misses the gate on experts</td><td>−20% throughput at 5.2 bits</td><td class="n">P0, wk 8</td><td>Widen to ×96 PHY, or drop a SKU tier</td></tr>
+        <tr><td>Routing agreement below 99.5%</td><td>Subtly wrong outputs that evals miss</td><td class="n">P0, wk 8</td><td>Router weights to FP32; re-tune expert-bias quantization</td></tr>
+        <tr><td>Dual-mode muxing lands on decode's critical path</td><td>Decode f<sub>max</sub> drops; the volume mode pays for the burst mode</td><td class="n">P2</td><td>Separate the mode registers a pipeline stage back; worst case, duplicate the accumulator path</td></tr>
+        <tr><td>DRAM efficiency below 85% of peak</td><td>Proportional throughput loss</td><td class="n">P1, wk 14</td><td>Re-layout the weight image for bank/row order; deepen streamer queues</td></tr>
+        <tr><td>Long-prompt TTFT unacceptable to the product</td><td>32K at 4 s reads as broken in some applications</td><td class="n">P1</td><td>Prefix KV caching; push §06 change 1; publish honest context limits</td></tr>
+        <tr><td>Array burst current causes IR droop</td><td>Timing failures only under prefill</td><td class="n">P4</td><td>Power grid sized for burst, not average; on-die decap; current-limited ramp</td></tr>
+        <tr><td>LPDDR5X PHY integration slips</td><td>Schedule, 2–4 months</td><td class="n">P4</td><td>Second-source the IP early; budget a PHY-only test chip</td></tr>
+        <tr><td>Next LFM changes architecture family</td><td>Fixed-function blocks stranded</td><td class="n">any</td><td>The §10 programmable vector unit is this insurance — do not value-engineer it out</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="lbl">Kill criteria — worth agreeing to in advance</span>
+    <p>Stop at P1 if modelled SKU B throughput lands below 45 tok/s at 4K context, or power exceeds 5 W, or TTFT at a 2K prompt exceeds 400 ms. Any of those means an off-the-shelf mobile NPU plus a good llama.cpp port beats this chip, and the honest move is to say so at week 14 rather than week 90. Stop at P0 if routing agreement cannot be brought above 99.5% at 4 bits — a chip that silently routes to the wrong expert is worse than no chip.</p>
+  </div>
+</section>
+
+<footer>
+  All parameter, traffic, KV, TTFT, power and area figures are computed by the tooling in this repository (<span style="font-family:var(--f-mono)">sonic/</span>; reproduce with <span style="font-family:var(--f-mono)">make numbers</span>) from the LiquidAI LFM2.5-8B-A1B, LFM2.5-2.6B and LFM2.5-8B-A1B-DSpark <span style="font-family:var(--f-mono)">config.json</span> files, and locked by <span style="font-family:var(--f-mono)">tests/test_spec.py</span>.<br>
+  Area, power, TTFT and cost figures are first-order planning estimates, not signoff numbers. Expert-overlap and speculative figures assume independent uniform routing and are a pessimistic bound. Every number here is a P0 or P1 deliverable to be replaced with a measured one.
+</footer>
+
+</div>

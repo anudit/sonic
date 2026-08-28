@@ -1,0 +1,22 @@
+{
+  "model": "LiquidAI/LFM2.5-8B-A1B",
+  "layer": 5,
+  "tokens": 512,
+  "d": 2048,
+  "experts": 32,
+  "top_k": 4,
+  "routing_agreement": 0.970703125,
+  "act_scale": 0.012895006833114023,
+  "bin": "router_l5.bin",
+  "layout": [
+    "n d E K (i32)",
+    "act_scale (f32)",
+    "h_q [n,d] i8",
+    "W_q [E,d] i8",
+    "W_scale [E,d/64] f32",
+    "bias [E] f32",
+    "sel [n,K] i32",
+    "h_f32 [n,d] f32",
+    "W_f32 [E,d] f32"
+  ]
+}

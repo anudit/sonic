@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+build/
+p0/out/
+p1/out/
+*.npz
+.DS_Store
+.venv/
+p2/ppa/out/
+*.incomplete
+JOURNEY.md
+installed.md
+p4/out/
