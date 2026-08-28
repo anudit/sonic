@@ -91,13 +91,51 @@ result:
   embedding are read every token. Checking resident against an active gate
   passes for the wrong reason.
 
+## Measured: the recipe fails `ppl_delta` by 40x
+
+16,376 tokens of WikiText-2 test, 8 windows of 2048, against the real 8.47 B
+checkpoint. Baseline BF16 perplexity 36.089.
+
+| control | weight relerr | `ppl_delta` | agreement (all) | agreement (p>0.9) |
+|---|---:|---:|---:|---:|
+| BF16 (null) | 0 | **0.0000** | **1.0000** | 1.0000 |
+| INT12 g64 | 5e-5 | +0.020 | 0.9148 | — |
+| INT8 g64 | 6e-3 | −0.027 | 0.8974 | — |
+| INT8 per-tensor | 3e-2 | +3.31 | 0.7304 | — |
+| **the recipe** | 1.1e-1 | **+6.23** | 0.6821 | **0.9900** |
+
+`ppl_delta` is +6.23 against a 0.15 gate, and the 95% CI `[+3.28, +10.37]` is
+resolved well above it. **The recipe as specified does not clear its own quality
+gate.**
+
+The formats are not the problem — the *method* is. This harness does naive
+round-to-nearest. RTN at 4 bits is the weakest possible scheme; clearing a
+0.15 ppl gate at 4.64 bits requires calibrated quantization (GPTQ/AWQ-style
+error compensation or activation-aware scaling). That is a requirement on the
+**offline packer**, not on the silicon: the hardware formats stay INT4 group-64
+plus an outlier budget either way. The next step is to implement calibration in
+the packer and re-run, not to widen the formats.
+
+Two things the controls established, which cost more to learn than to state:
+
+- **`top1_agreement` over all corpus positions cannot reach 0.99 for any
+  format.** An essentially lossless 5e-5 perturbation (INT12) flips 8.5% of
+  argmax decisions. 56% of WikiText-2 positions have BF16 top-1 probability
+  below 0.5, and those flip under any perturbation while saying nothing about
+  the format. Stratified by confidence, the recipe scores **0.9900 on the 13% of
+  positions where BF16 is actually confident** — it meets the gate where the
+  metric means something. The gate text says "greedy decode over 10K prompts",
+  which is model-generated text where the model *is* confident; measuring over a
+  raw corpus is a stricter and largely meaningless test.
+- **Per-tensor INT8 is itself lossy** (+3.31 ppl). `quant.py` specifies INT8 as
+  "per-tensor scale" for GQA attention and the dense FFN. Real INT8 schemes are
+  per-channel. That spec line is worth revisiting on its own.
+
 ## Open items, in priority order
 
-0. **Run the gates.** `p0/gates.py` is written and its kernels are unit-checked,
-   but it has never been run against the 8.47 B checkpoint. Until it has,
-   `ppl_delta`, `top1_agreement` and `bench_drop` are unmeasured, and every
-   format decision downstream — accumulator widths, PWL segment counts, the
-   traffic model — rests on a recipe assumed good rather than shown good.
+0. **Implement calibration in the packer and re-run the gates.** Everything
+   below is downstream of a recipe that currently misses its perplexity gate by
+   40x under RTN.
 1. **Measure the drafter's acceptance rate** on representative workloads. It is
    now the only free variable in the speculative-decode budget: at p = 0.80 the
    gain is 1.61x, at p = 0.90 it is 2.36x. Needs the DSpark checkpoint.

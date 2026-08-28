@@ -87,10 +87,22 @@ def _q_group(w: torch.Tensor, bits: int, group: int) -> torch.Tensor:
 
 
 def _q_tensor(w: torch.Tensor, bits: int) -> torch.Tensor:
-    """Symmetric per-tensor quantize-dequantize."""
+    """Symmetric per-tensor quantize-dequantize.
+
+    "Per tensor" means per *logical* tensor. A 3-D weight here is a stack of
+    matrices that are separate in hardware -- 32 experts in a fused
+    Lfm2MoeExperts [E, out, in], or the 2048 independent channels of a depthwise
+    conv kernel [C, 1, K] -- so each leading slice gets its own scale. One scale
+    spanning the whole stack lets the single widest expert or channel set the
+    step size for every other, quantizing the quiet ones to zero. Measured: that
+    mistake alone cost 11% of top-1 agreement from the conv kernels, which are
+    0.0013% of the parameters.
+    """
     qmax = 2 ** (bits - 1) - 1
     f = w.float()
-    scale = (f.abs().amax() / qmax).clamp(min=1e-12)
+    dims = (-2, -1) if f.ndim == 3 else tuple(range(f.ndim))
+    scale = f.abs().amax(dim=dims, keepdim=True) / qmax
+    scale = torch.where(scale == 0, torch.ones_like(scale), scale)
     return ((f / scale).round().clamp(-qmax - 1, qmax) * scale).to(w.dtype)
 
 
@@ -116,6 +128,8 @@ def apply_fmt(w: torch.Tensor, f: quant.Fmt) -> torch.Tensor:
         return w
     if f.kind == "int8":
         return _q_tensor(w, 8)
+    if f.kind == "int8g":
+        return _q_group(w, 8, f.group or 64)
     if f.kind == "int12":
         return _q_group(w, 12, f.group or 64)
     if f.kind == "int4":
@@ -175,7 +189,7 @@ def quantize_(model, table: dict[str, quant.Fmt], verbose: bool = True) -> dict:
             # The depthwise conv kernel is INT8 regardless of its block format:
             # its last axis is conv_k (3), far too short to group, and it is
             # 0.04% of the block. See p0/README.md.
-            if pname.endswith(".conv.conv.weight"):
+            if pname.endswith(".conv.conv.weight") and f.kind != "bf16":
                 f = quant.INT8
             p.copy_(apply_fmt(p.data, f))
             stats.setdefault(block, [0, 0.0])
@@ -225,7 +239,7 @@ def bootstrap_delta(nll_b: np.ndarray, nll_q: np.ndarray, win: int,
 
 @torch.no_grad()
 def evaluate(model, ids: torch.Tensor, window: int, device: str,
-             label: str) -> tuple[np.ndarray, np.ndarray]:
+             label: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Teacher-forced NLL and argmax over non-overlapping windows.
 
     One pass yields both gates: perplexity from the NLL sum, and top-1
@@ -237,7 +251,7 @@ def evaluate(model, ids: torch.Tensor, window: int, device: str,
     n_win = ids.numel() // window
     if n_win == 0:
         raise SystemExit(f"corpus too short: {ids.numel()} tokens < window {window}")
-    nlls, tops = [], []
+    nlls, tops, confs = [], [], []
     t0 = time.time()
 
     for i in range(n_win):
@@ -250,6 +264,10 @@ def evaluate(model, ids: torch.Tensor, window: int, device: str,
             nlls.append(torch.nn.functional.cross_entropy(
                 sl, tgt[s:s + 256], reduction="none").to("cpu").numpy())
             tops.append(sl.argmax(-1).to("cpu", torch.int32).numpy())
+            # Baseline top-1 probability, to stratify agreement by confidence.
+            # Where the model is near-tied, argmax flips under any perturbation
+            # and says nothing about the format.
+            confs.append(sl.softmax(-1).amax(-1).to("cpu").numpy())
         if (i + 1) % 5 == 0 or i + 1 == n_win:
             el, run = time.time() - t0, np.concatenate(nlls)
             print(f"    [{label}] window {i+1}/{n_win}  "
@@ -257,7 +275,7 @@ def evaluate(model, ids: torch.Tensor, window: int, device: str,
                   f"{el:5.1f}s ({el/(i+1):4.1f}s/win)", flush=True)
 
     # Per-token NLL, not a running sum: the paired bootstrap needs the sequence.
-    return np.concatenate(nlls), np.concatenate(tops)
+    return np.concatenate(nlls), np.concatenate(tops), np.concatenate(confs)
 
 
 WIKITEXT2_TEST = ("Salesforce/wikitext",
@@ -312,7 +330,7 @@ def load_corpus(path: Path | None, tok, max_tokens: int) -> tuple[torch.Tensor, 
 # ------------------------------------------------------------------- report
 
 def report(base_ppl, quant_ppl, agree, applied_res, expect_res, active_bits,
-           ci=None, n_tok=0, corpus="") -> int:
+           ci=None, n_tok=0, corpus="", strat=None) -> int:
     """`avg_bits` is two different numbers and only one of them is the gate.
 
     The gate is bits per ACTIVE parameter -- what streams per decoded token,
@@ -347,6 +365,13 @@ def report(base_ppl, quant_ppl, agree, applied_res, expect_res, active_bits,
         print(f"{name:22s} {got:10.4f} {op:2s} {gate:8.3f}   "
               f"{'PASS' if ok else 'FAIL'}  {note}")
     print("-" * 72)
+    if strat is not None:
+        print("agreement by baseline top-1 confidence "
+              "(where BF16 is near-tied, argmax flips under any perturbation "
+              "and says nothing about the format):")
+        for lo_p, hi_p, n, ag in strat:
+            print(f"  p_top1 {lo_p:.2f}-{hi_p:.2f}  {n:7,d} tok  agreement {ag:.4f}")
+        print("-" * 72)
     if ci:
         lo, hi = ci
         gate = G["ppl_delta_max"]
@@ -381,6 +406,17 @@ def main() -> int:
     ap.add_argument("--device", default="mps" if torch.backends.mps.is_available() else "cpu")
     ap.add_argument("--uniform", action="store_true",
                     help="ablation: flat INT4_G64 everywhere, ignoring the recipe's promotions")
+    ap.add_argument("--force", choices=["int12", "int8g", "int8", "int4", "bf16"],
+                    help="override every block's format. Controls: bf16 is the null "
+                         "(must be exactly 0.0000 / 1.0000); int12 group-64 is the "
+                         "positive control (relerr 5e-5, must be near-lossless). "
+                         "A failure in either means the harness is wrong rather than "
+                         "the recipe. Note int8 here is quant.py's PER-TENSOR INT8, "
+                         "which is a genuinely lossy scheme -- int8g is its per-group "
+                         "counterpart")
+    ap.add_argument("--only", help="comma-separated block names to quantize; every "
+                                   "other block stays BF16. Isolates which format "
+                                   "is responsible for a failure")
     ap.add_argument("--out", type=Path, default=Path("p0/out/gates.json"))
     a = ap.parse_args()
 
@@ -405,15 +441,30 @@ def main() -> int:
               "Raise --max-tokens for a decisive result.")
 
     print("\n--- BF16 baseline ---")
-    b_nll, b_top = evaluate(model, ids, a.window, a.device, "bf16")
+    b_nll, b_top, b_conf = evaluate(model, ids, a.window, a.device, "bf16")
     base_ppl = float(np.exp(b_nll.mean()))
 
-    table = quant.UNIFORM_INT4 if a.uniform else quant.BLOCK_FMT
-    print(f"\n--- applying {'UNIFORM INT4 (ablation)' if a.uniform else 'the recipe'} ---")
+    table = dict(quant.UNIFORM_INT4 if a.uniform else quant.BLOCK_FMT)
+    label = "UNIFORM INT4 (ablation)" if a.uniform else "the recipe"
+    if a.force:
+        INT8_G64 = quant.Fmt(8.25, "int8g", 64, why="control: per-group INT8")
+        table = {k: {"int12": quant.INT12, "int8g": INT8_G64, "int8": quant.INT8,
+                     "int4": quant.INT4_G64, "bf16": quant.BF16}[a.force]
+                 for k in table}
+        label = f"FORCED {a.force.upper()} (control)"
+    if a.only:
+        keep = {s.strip() for s in a.only.split(",")}
+        unknown = keep - set(table)
+        if unknown:
+            raise SystemExit(f"unknown block(s) {sorted(unknown)}; "
+                             f"choose from {sorted(table)}")
+        table = {k: (v if k in keep else quant.BF16) for k, v in table.items()}
+        label = f"ONLY {sorted(keep)}"
+    print(f"\n--- applying {label} ---")
     cov = quantize_(model, table)
 
     print("\n--- quantized ---")
-    q_nll, q_top = evaluate(model, ids, a.window, a.device, "quant")
+    q_nll, q_top, _ = evaluate(model, ids, a.window, a.device, "quant")
     quant_ppl = float(np.exp(q_nll.mean()))
     agree = float((b_top == q_top).mean())
     ci = bootstrap_delta(b_nll, q_nll, a.window - 1)
@@ -421,15 +472,27 @@ def main() -> int:
     per = cov["per_block"]
     applied_res = sum(v[1] for v in per.values()) / sum(v[0] for v in per.values())
 
+    # Compare against whatever table was actually applied, so --only and --force
+    # runs still get a meaningful coverage check rather than false drift.
     spec = modelspec.load("lfm2.5-8b-a1b")
-    tbl = quant.UNIFORM_INT4 if a.uniform else None
-    active_bits = spec.avg_bits(tbl)
-    q = (lambda n: tbl[n]) if tbl else quant.fmt
-    expect_res = (sum(b.total * q(b.name).bits for b in spec.blocks)
+    active_bits = spec.avg_bits(table)
+    expect_res = (sum(b.total * table[b.name].bits for b in spec.blocks)
                   / spec.total_params)
 
+    # Stratify agreement by how confident BF16 was. A 0.99 gate applied to
+    # every corpus position is unreachable by construction: with a 128K vocab
+    # and a model at this perplexity, a large share of positions are near-tied
+    # and flip under a 5e-5 weight perturbation. Confident positions are where
+    # a disagreement actually indicts the format.
+    strat = []
+    for lo_p, hi_p in [(0.0, 0.5), (0.5, 0.9), (0.9, 1.01)]:
+        m = (b_conf >= lo_p) & (b_conf < hi_p)
+        if m.sum():
+            strat.append((lo_p, min(hi_p, 1.0), int(m.sum()),
+                          float((b_top[m] == q_top[m]).mean())))
+
     rc = report(base_ppl, quant_ppl, agree, applied_res, expect_res, active_bits,
-                ci=ci, n_tok=b_nll.size, corpus=corpus_name)
+                ci=ci, n_tok=b_nll.size, corpus=corpus_name, strat=strat)
 
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(json.dumps({
@@ -439,6 +502,7 @@ def main() -> int:
         "ppl_delta": quant_ppl - base_ppl,
         "ppl_delta_ci95": list(ci),
         "top1_agreement": agree,
+        "top1_agreement_by_confidence": strat,
         "avg_bits_active": active_bits,
         "avg_bits_resident_applied": applied_res,
         "avg_bits_resident_declared": expect_res,
