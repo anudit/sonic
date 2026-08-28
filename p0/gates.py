@@ -168,7 +168,8 @@ def classify(pname: str, p: torch.Tensor) -> str | None:
     return None
 
 
-def quantize_(model, table: dict[str, quant.Fmt], verbose: bool = True) -> dict:
+def quantize_(model, table: dict[str, quant.Fmt], verbose: bool = True,
+              mode: str = "rtn", acts: dict | None = None) -> dict:
     """Fake-quantize every weight in place. Returns a coverage report."""
     stats: dict[str, list[int]] = {}
     skipped: list[tuple[str, tuple]] = []
@@ -191,7 +192,12 @@ def quantize_(model, table: dict[str, quant.Fmt], verbose: bool = True) -> dict:
             # 0.04% of the block. See p0/README.md.
             if pname.endswith(".conv.conv.weight") and f.kind != "bf16":
                 f = quant.INT8
-            p.copy_(apply_fmt(p.data, f))
+            if mode == "rtn":
+                p.copy_(apply_fmt(p.data, f))
+            else:
+                from p0 import packer
+                p.copy_(packer.pack(p.data, f, mode,
+                                    (acts or {}).get(pname)))
             stats.setdefault(block, [0, 0.0])
             stats[block][0] += p.numel()
             stats[block][1] += p.numel() * f.bits
@@ -404,6 +410,11 @@ def main() -> int:
     ap.add_argument("--max-tokens", type=int, default=65536)
     ap.add_argument("--window", type=int, default=2048)
     ap.add_argument("--device", default="mps" if torch.backends.mps.is_available() else "cpu")
+    ap.add_argument("--pack", choices=["rtn", "clip", "awq"], default="rtn",
+                    help="packer strategy. rtn is naive round-to-nearest; clip searches the\n"
+                         "clipping ratio; awq adds activation-aware scaling. All three\n"
+                         "emit the SAME format -- only the scales and rounding differ")
+    ap.add_argument("--calib-windows", type=int, default=4)
     ap.add_argument("--uniform", action="store_true",
                     help="ablation: flat INT4_G64 everywhere, ignoring the recipe's promotions")
     ap.add_argument("--force", choices=["int12", "int8g", "int8", "int4", "bf16"],
@@ -444,6 +455,20 @@ def main() -> int:
     b_nll, b_top, b_conf = evaluate(model, ids, a.window, a.device, "bf16")
     base_ppl = float(np.exp(b_nll.mean()))
 
+    acts = None
+    if a.pack == "awq":
+        from p0 import packer
+        print("\n--- calibrating (activation magnitudes, BF16 model) ---")
+        t1 = time.time()
+        acts = packer.collect_act_scales(model, ids, a.window, a.device,
+                                         a.calib_windows)
+        # lm_head is tied to embed_tokens, and the parameter we quantize is the
+        # embedding one; carry its activation across or the LM head silently
+        # falls back to clip search.
+        if "lm_head.weight" in acts:
+            acts.setdefault("model.embed_tokens.weight", acts["lm_head.weight"])
+        print(f"  captured {len(acts)} activation vectors in {time.time()-t1:.1f}s")
+
     table = dict(quant.UNIFORM_INT4 if a.uniform else quant.BLOCK_FMT)
     label = "UNIFORM INT4 (ablation)" if a.uniform else "the recipe"
     if a.force:
@@ -460,8 +485,8 @@ def main() -> int:
                              f"choose from {sorted(table)}")
         table = {k: (v if k in keep else quant.BF16) for k, v in table.items()}
         label = f"ONLY {sorted(keep)}"
-    print(f"\n--- applying {label} ---")
-    cov = quantize_(model, table)
+    print(f"\n--- applying {label} via packer={a.pack} ---")
+    cov = quantize_(model, table, mode=a.pack, acts=acts)
 
     print("\n--- quantized ---")
     q_nll, q_top, _ = evaluate(model, ids, a.window, a.device, "quant")
@@ -497,6 +522,7 @@ def main() -> int:
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(json.dumps({
         "model": a.model, "uniform": a.uniform, "corpus": corpus_name,
+        "pack": a.pack,
         "tokens": int(b_nll.size), "window": a.window,
         "ppl_bf16": base_ppl, "ppl_quant": quant_ppl,
         "ppl_delta": quant_ppl - base_ppl,
