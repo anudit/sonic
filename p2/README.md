@@ -154,6 +154,52 @@ timing.
 the real price of the P0 finding that a 12-bit local path is illegal for
 INT4 × INT8. Cheap.
 
+## Finding 16: `sonic_router` cannot be clocked, in any process
+
+P4 sent block-level P&R through post-CTS timing repair and it reported
+**WNS -1086.6 ns against a 10 ns clock** on the top-k `sel[]` path — an actual
+critical-path delay of roughly 1,097 ns. That number is large enough to look
+like a units error, so it was checked independently with Yosys, at the same
+configuration P4 was running (`LANES=4`, `ROUTER_PWL_SEGS=8`):
+
+| unit | combinational depth |
+|---|---:|
+| `sonic_acc` | 59 |
+| **`sonic_router`** | **2,518** |
+
+2,518 levels at roughly 0.43 ns per level on Sky130 is ~1,090 ns. It reproduces
+the WNS almost exactly, from a completely separate tool. **The timing violation
+is real.**
+
+Three consequences, in order of how much they hurt:
+
+1. **A faster process does not save it.** Sky130 at 130 nm to 14 nm is roughly
+   10-15x per gate, so ~1,097 ns becomes ~75-110 ns. Against S1's 1 GHz target —
+   a 1 ns period — the router is still 75-110x too slow. This is not a Sky130
+   artefact and it is not something P&R can fix.
+2. **The measured configuration is the small one.** `LANES=4` and `SEGS=8`. The
+   shipping `LANES=64`, `SEGS=64` has a wider segment-select mux and a wider
+   top-k network, so its path is *deeper* than 2,518, never shallower.
+3. **Raising `CLOCK_PERIOD` to 1500 ns is the right call to unblock P&R and the
+   wrong thing to record as a result.** It lets the flow reach routing, which is
+   what P4 is for. It does not make the design meet timing, and the resulting
+   layout must not be quoted as evidence that it does.
+
+The fix is pipelining the score -> sigmoid PWL -> top-k -> select chain, which
+is RTL work in P2, not a knob in P4. Function is preserved by pipelining, so
+`make p2-router` stays valid against the real tensors once the bench's latency
+expectation is updated.
+
+**Why this was not caught sooner:** `sonic_router` was missing from `UNITS` in
+`ppa/loop.py`. The one unit with a pathological critical path was the one unit
+excluded from the loop built to measure critical paths. It is in the table now,
+though outside the default sweep — even at `SEGS=8` it takes minutes under
+`abc -g cmos2 -dff`, so run it deliberately:
+
+```
+python3 p2/ppa/loop.py --unit sonic_router
+```
+
 ## Caveats
 
 - Depth and cell counts come from `abc -g cmos2` against a **generic** library

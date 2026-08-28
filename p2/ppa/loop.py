@@ -43,6 +43,12 @@ UNITS = {
     "sonic_lmhead":   ["sonic_lmhead.sv"],
     "sonic_streamer": ["sonic_streamer.sv"],
     "sonic_seq":      ["sonic_seq.sv"],
+    # The router was missing from this table until P4 found why it mattered:
+    # block-level P&R reported WNS -1086.6 ns at a 10 ns clock, and an
+    # independent depth measurement put its combinational path at 2,518 levels
+    # against sonic_acc's 59. The one unit with a pathological critical path was
+    # the one unit excluded from the loop built to measure critical paths.
+    "sonic_router":   ["sonic_router.sv"],
 }
 
 # What the roofline says each unit is worth, so the loop cannot mislead.
@@ -54,6 +60,7 @@ CONTEXT = {
     "sonic_lmhead":   "0.14 mm2 that saves ~8% of all decode traffic",
     "sonic_streamer": "THE critical path -- if this stalls, the chip stops",
     "sonic_seq":      "control, not datapath; f_max here is irrelevant",
+    "sonic_router":   "2,518 levels deep -- CANNOT be clocked; needs pipelining",
 }
 
 
@@ -71,8 +78,16 @@ class Result:
                 f"dffs={self.area:5,.0f} depth={self.depth:4d}")
 
 
+# Units that need a define before they will elaborate standalone.
+# SEGS=8, not the shipping 64: ABC's technology mapping on the segment-select
+# mux tree runs for hours at 64 and never converges -- reproduced locally and on
+# the P4 box. 8 is the tractable point for a relative signal, and the shipping
+# config is DEEPER than whatever this reports, never shallower.
+REQUIRED_DEFINES = {"sonic_router": {"ROUTER_PWL_SEGS": 8}}
+
+
 def synth(unit: str, params: dict | None = None) -> Result | None:
-    params = params or {}
+    params = {**REQUIRED_DEFINES.get(unit, {}), **(params or {})}
     srcs = " ".join(str(RTL / f) for f in UNITS[unit])
     defines = " ".join(f"-D{k}={v}" for k, v in params.items())
     OUT.mkdir(parents=True, exist_ok=True)
@@ -128,6 +143,13 @@ ltp -noff
     return int(m.group(1)) if m else -1
 
 
+# Measurable on request, but not in the default sweep: even at SEGS=8 the
+# router takes many minutes under this flow's `abc -g cmos2 -dff` sequential
+# mapping, and `make p2` has to stay fast. Run it deliberately:
+#     python3 p2/ppa/loop.py --unit sonic_router
+SLOW = {"sonic_router"}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -135,22 +157,25 @@ def main() -> int:
     ap.add_argument("--sweep", help="PARAM=v1,v2,v3")
     a = ap.parse_args()
 
-    units = [a.unit] if a.unit else list(UNITS)
+    units = [a.unit] if a.unit else [u for u in UNITS if u not in SLOW]
+    if not a.unit and SLOW:
+        print(f"skipping {', '.join(sorted(SLOW))} (slow; pass --unit to include)",
+              flush=True)
     results: list[Result] = []
 
     for u in units:
-        print(f"\n{u}  --  {CONTEXT.get(u, '')}")
+        print(f"\n{u}  --  {CONTEXT.get(u, '')}", flush=True)
         if a.sweep:
             key, vals = a.sweep.split("=")
             for v in vals.split(","):
                 r = synth(u, {key: v})
                 if r:
-                    print(f"  {r}")
+                    print(f"  {r}", flush=True)
                     results.append(r)
         else:
             r = synth(u)
             if r:
-                print(f"  {r}")
+                print(f"  {r}", flush=True)
                 results.append(r)
 
     if results:
