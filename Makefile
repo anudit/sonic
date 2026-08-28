@@ -1,4 +1,4 @@
-.PHONY: all test golden p0 p0-gates p0-gates-uniform p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
+.PHONY: all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
 
 # Homebrew's binutils shadows Apple's ar with GNU ar, whose archives macOS ld
 # rejects. Verilator links fail without this.
@@ -31,6 +31,10 @@ p0-gates:
 # its 0.39 extra bits, or would flat INT4 clear the gates just as well?
 p0-gates-uniform:
 	@.venv/bin/python p0/gates.py $(if $(CORPUS),--corpus $(CORPUS),) --uniform
+
+# P0-5: local accumulator bounds against real activations.
+p0-accbound:
+	@.venv/bin/python p0/accbound.py --tokens $(or $(TOKENS),2048)
 
 # --- P1: architecture model ---
 p1:

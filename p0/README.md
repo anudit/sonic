@@ -244,6 +244,43 @@ Two things the controls established, which cost more to learn than to state:
   "per-tensor scale" for GQA attention and the dense FFN. Real INT8 schemes are
   per-channel. That spec line is worth revisiting on its own.
 
+## P0-5 measured: 12 bits is dead, and the INT8 blocks have no datapath
+
+`make p0-accbound`. The local accumulator holds a fold-16 partial sum of raw
+INT4 x INT8 *codes* — `sonic_streamer.sv` applies the group scale to the
+accumulated sum, not to individual weights, so codes are the right domain.
+WikiText-2 activations through the real checkpoint:
+
+| block | weights | worst case | 512 tok | 2048 tok | bits needed |
+|---|---:|---:|---:|---:|---:|
+| MoE experts | INT4 | 16,384 | 3,316 | 3,274 | **13** |
+| Short-conv | INT4 | 16,384 | 3,227 | — | 13 |
+| Dense FFN | INT8 | 262,144 | 34,535 | — | 17 |
+| GQA attention | INT8 | 262,144 | 66,305 | **70,896** | **18** |
+
+**The 12-bit hope is refuted.** `p0/README` proposed that measured ranges might
+allow 12 bits and buy back the 4 logic levels the 12 -> 16 fix cost. They do
+not: 12 bits signed holds ±2,047 and the INT4 path measures ~3,300. What is
+available is **14 bits** — 2.5x headroom over measured, against 16 today, so a
+2-bit saving rather than 4. 13 bits would fit the measurement with 1.24x
+headroom, which is too thin for a bound that is evidence rather than proof.
+
+**The unlooked-for finding: the INT8-weight blocks need 18 bits and have no
+datapath at all.** `W_BITS` in `sonic_defs.svh` is a global `4`, and
+`ACC_LOCAL = 16` is derived from `16 * 8 * 128`. The recipe assigns INT8 weights
+to GQA attention and the dense FFN. Those blocks measure 70,896 in the local
+accumulator — a 16-bit path overflows. The array's "dual mode" is
+`MODE_DECODE` / `MODE_PREFILL`, which is *dataflow*, not precision, so there is
+no INT8-weight mode to fall back on. Either those GEMMs need a wider local stage
+selected by a precision mode, or they are not running on this array and the plan
+should say what does run them.
+
+Note the INT8 figure is still climbing with sample size — 66,305 at 512 tokens,
+70,896 at 2,048 — so it is a floor, not a converged bound. The INT4 figure is
+stable across offsets (3,225 / 3,274 / 3,316), which is why a 14-bit
+recommendation is defensible there and no equivalent recommendation is offered
+here.
+
 ## Open items, in priority order
 
 0. **Implement calibration in the packer and re-run the gates.** Everything
@@ -252,9 +289,10 @@ Two things the controls established, which cost more to learn than to state:
 1. **Measure the drafter's acceptance rate** on representative workloads. It is
    now the only free variable in the speculative-decode budget: at p = 0.80 the
    gain is 1.61x, at p = 0.90 it is 2.36x. Needs the DSpark checkpoint.
-2. **Prove accumulator bounds per layer against real activations**, not against
-   the worst case. The worst case forced a 16-bit local path; measured
-   activation ranges may allow 12 and buy back clock frequency.
+2. ~~Prove accumulator bounds per layer against real activations~~ — **done,
+   above.** 12 bits is refuted; 14 is available on the INT4 path. The INT8
+   blocks need 18 bits and currently have no datapath, which is now the item
+   that matters.
 3. **Extend the C golden model** from primitives to full layers, so RTL has
    something to diff against beyond the numeric kernels.
 4. **Validate the PWL segment count** against the perplexity gate. 16 uniform
