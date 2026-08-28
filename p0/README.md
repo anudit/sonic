@@ -53,6 +53,29 @@ Not covered here, by design: accumulator width and PWL error (those are
 `p0/golden/` and the RTL benches), activation quantization (`BLOCK_FMT` is a
 weight table), and `bench_drop`, which needs a real benchmark suite.
 
+### How many tokens are enough
+
+The harness answers this rather than guessing: it reports a 95% CI on
+`ppl_delta` from a **block bootstrap over windows**, and says `UNRESOLVED` when
+the interval straddles the 0.15 gate. A point estimate inside the gate whose
+interval spans it has not decided anything, and should not read as a pass.
+
+Windows, not tokens, are the resampling unit — tokens inside a window share a
+prefix and are strongly correlated, so a token-level bootstrap reports an
+interval several times too narrow.
+
+The comparison is **paired**: both passes see identical tokens in identical
+order, so the same resampled windows serve both. That cancels most of the
+corpus-difficulty variance, which is why a few tens of thousands of tokens
+resolve a gate that would need far more from two independent samples.
+
+WikiText-2's test split is 0.73 MB and ~280 K tokens — it is the standard
+perplexity corpus *because* it is small, so there is little to gain from
+hunting a smaller one. `--max-tokens` is the runtime lever, not the corpus.
+No `datasets` install required: the loader falls back to reading the parquet
+with `pyarrow` + `huggingface_hub`, a much lighter dependency that does have a
+cp314 wheel.
+
 Two traps this harness exists to avoid, both of which silently *flatter* the
 result:
 

@@ -200,9 +200,32 @@ def quantize_(model, table: dict[str, quant.Fmt], verbose: bool = True) -> dict:
 
 # --------------------------------------------------------------- evaluation
 
+def bootstrap_delta(nll_b: np.ndarray, nll_q: np.ndarray, win: int,
+                    n_boot: int = 4000, seed: int = 0) -> tuple[float, float]:
+    """95% CI on ppl_delta, resampling WINDOWS rather than tokens.
+
+    Tokens inside a window are strongly correlated -- the model is conditioning
+    on the same prefix -- so a token-level bootstrap would report a confidence
+    interval several times too narrow. Windows are the independent unit.
+
+    The comparison is paired: both passes see identical token sequences in
+    identical order, so the same resampled windows are used for both. That
+    cancels most of the corpus-difficulty variance and is why a few tens of
+    thousands of tokens resolve a 0.15 gate that would need far more if the two
+    runs were independent samples.
+    """
+    n = (nll_b.size // win) * win
+    b = nll_b[:n].reshape(-1, win)
+    q = nll_q[:n].reshape(-1, win)
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, b.shape[0], size=(n_boot, b.shape[0]))
+    d = np.exp(q[idx].mean((1, 2))) - np.exp(b[idx].mean((1, 2)))
+    return float(np.percentile(d, 2.5)), float(np.percentile(d, 97.5))
+
+
 @torch.no_grad()
 def evaluate(model, ids: torch.Tensor, window: int, device: str,
-             label: str) -> tuple[float, int, np.ndarray]:
+             label: str) -> tuple[np.ndarray, np.ndarray]:
     """Teacher-forced NLL and argmax over non-overlapping windows.
 
     One pass yields both gates: perplexity from the NLL sum, and top-1
@@ -214,7 +237,7 @@ def evaluate(model, ids: torch.Tensor, window: int, device: str,
     n_win = ids.numel() // window
     if n_win == 0:
         raise SystemExit(f"corpus too short: {ids.numel()} tokens < window {window}")
-    nll_sum, n_tok, tops = 0.0, 0, []
+    nlls, tops = [], []
     t0 = time.time()
 
     for i in range(n_win):
@@ -224,41 +247,72 @@ def evaluate(model, ids: torch.Tensor, window: int, device: str,
         # Slice the vocab softmax: [2047, 128000] in float32 is ~1 GB in one go.
         for s in range(0, logits.shape[0], 256):
             sl = logits[s:s + 256].float()
-            nll_sum += torch.nn.functional.cross_entropy(
-                sl, tgt[s:s + 256], reduction="sum").item()
+            nlls.append(torch.nn.functional.cross_entropy(
+                sl, tgt[s:s + 256], reduction="none").to("cpu").numpy())
             tops.append(sl.argmax(-1).to("cpu", torch.int32).numpy())
-        n_tok += tgt.numel()
         if (i + 1) % 5 == 0 or i + 1 == n_win:
-            el = time.time() - t0
+            el, run = time.time() - t0, np.concatenate(nlls)
             print(f"    [{label}] window {i+1}/{n_win}  "
-                  f"ppl {np.exp(nll_sum/n_tok):8.3f}  "
+                  f"ppl {np.exp(run.mean()):8.3f}  "
                   f"{el:5.1f}s ({el/(i+1):4.1f}s/win)", flush=True)
 
-    return nll_sum, n_tok, np.concatenate(tops)
+    # Per-token NLL, not a running sum: the paired bootstrap needs the sequence.
+    return np.concatenate(nlls), np.concatenate(tops)
 
 
-def load_corpus(path: Path | None, tok, max_tokens: int) -> torch.Tensor:
+WIKITEXT2_TEST = ("Salesforce/wikitext",
+                  "wikitext-2-raw-v1/test-00000-of-00001.parquet")
+
+
+def wikitext2_text() -> str:
+    """WikiText-2 test split as plain text.
+
+    The split is 0.73 MB on disk and ~280 K tokens -- it is the standard
+    perplexity corpus precisely because it is small, so there is nothing
+    meaningful to gain by finding a smaller one. What costs time is
+    --max-tokens, not the download.
+
+    Prefers `datasets`, but falls back to reading the parquet directly with
+    pyarrow + huggingface_hub. pyarrow alone is a far lighter dependency than
+    `datasets`, and it has a cp314 wheel -- which is not a given on this Python
+    (see installed.md on cocotb).
+    """
+    try:
+        from datasets import load_dataset
+        return "\n\n".join(load_dataset(
+            "wikitext", "wikitext-2-raw-v1", split="test")["text"])
+    except ImportError:
+        pass
+    try:
+        import pyarrow.parquet as pq
+        from huggingface_hub import hf_hub_download
+    except ImportError:
+        raise SystemExit(
+            "No --corpus given, and neither `datasets` nor `pyarrow` is "
+            "installed.\n"
+            "  lightest:  pip install pyarrow\n"
+            "  or:        pip install datasets\n"
+            "  or:        pass --corpus <a plain text file>\n"
+            "The gate names WikiText-2; anything else must be reported as what "
+            "it actually is.")
+    p = hf_hub_download(WIKITEXT2_TEST[0], WIKITEXT2_TEST[1], repo_type="dataset")
+    rows = pq.read_table(p).column("text").to_pylist()
+    return "\n\n".join(r for r in rows if r.strip())
+
+
+def load_corpus(path: Path | None, tok, max_tokens: int) -> tuple[torch.Tensor, str]:
     if path:
-        text = path.read_text(encoding="utf-8", errors="replace")
+        text, name = path.read_text(encoding="utf-8", errors="replace"), path.name
     else:
-        try:
-            from datasets import load_dataset
-        except ImportError:
-            raise SystemExit(
-                "No --corpus given and `datasets` is not installed.\n"
-                "  either:  pip install datasets\n"
-                "  or:      pass --corpus <a plain text file>\n"
-                "The gate names WikiText-2; anything else must be labelled as "
-                "what it actually is.")
-        ds = load_dataset("wikitext", "wikitext-2-raw-v1", split="test")
-        text = "\n\n".join(ds["text"])
+        text, name = wikitext2_text(), "wikitext-2 test"
     ids = tok(text, return_tensors="pt").input_ids[0]
-    return ids[:max_tokens]
+    return ids[:max_tokens], name
 
 
 # ------------------------------------------------------------------- report
 
-def report(base_ppl, quant_ppl, agree, applied_res, expect_res, active_bits) -> int:
+def report(base_ppl, quant_ppl, agree, applied_res, expect_res, active_bits,
+           ci=None, n_tok=0, corpus="") -> int:
     """`avg_bits` is two different numbers and only one of them is the gate.
 
     The gate is bits per ACTIVE parameter -- what streams per decoded token,
@@ -283,6 +337,7 @@ def report(base_ppl, quant_ppl, agree, applied_res, expect_res, active_bits) -> 
          f"applied {applied_res:.3f} vs declared {expect_res:.3f} bits resident"),
     ]
     print("\n" + "=" * 72)
+    print(f"{corpus}, {n_tok:,} tokens")
     print(f"{'gate':22s} {'measured':>10s} {'':2s} {'gate':>8s}   note")
     print("-" * 72)
     bad = 0
@@ -292,6 +347,20 @@ def report(base_ppl, quant_ppl, agree, applied_res, expect_res, active_bits) -> 
         print(f"{name:22s} {got:10.4f} {op:2s} {gate:8.3f}   "
               f"{'PASS' if ok else 'FAIL'}  {note}")
     print("-" * 72)
+    if ci:
+        lo, hi = ci
+        gate = G["ppl_delta_max"]
+        # A verdict that is inside the gate but whose interval straddles it has
+        # not actually decided anything -- report that rather than let a lucky
+        # point estimate read as a pass.
+        if lo <= gate <= hi:
+            v = "UNRESOLVED -- interval straddles the gate, raise --max-tokens"
+        elif hi < gate:
+            v = "resolved: below the gate"
+        else:
+            v = "resolved: above the gate"
+        print(f"{'ppl_delta 95% CI':22s} [{lo:+.4f}, {hi:+.4f}]   {v}")
+        print("-" * 72)
     print(f"{'routing_agreement':22s} {0.998:10.4f} >= "
           f"{G['routing_agreement_min']:8.3f}   PASS  measured in "
           f"p2/tb/tb_router.cpp, not here")
@@ -326,23 +395,28 @@ def main() -> int:
     model.eval()
     print(f"  loaded in {time.time()-t0:.1f}s")
 
-    ids = load_corpus(a.corpus, tok, a.max_tokens)
+    ids, corpus_name = load_corpus(a.corpus, tok, a.max_tokens)
     inst = tok("\n\n".join(INSTRUCTIONS), return_tensors="pt").input_ids[0]
-    print(f"  corpus {ids.numel():,} tokens, instructions {inst.numel():,} tokens, "
-          f"window {a.window}")
+    n_win = ids.numel() // a.window
+    print(f"  {corpus_name}: {ids.numel():,} tokens, {n_win} windows of {a.window}"
+          f"  (+{inst.numel():,} instruction tokens)")
+    if n_win < 8:
+        print("  NOTE: fewer than 8 windows -- the bootstrap CI will be wide. "
+              "Raise --max-tokens for a decisive result.")
 
     print("\n--- BF16 baseline ---")
-    b_nll, b_n, b_top = evaluate(model, ids, a.window, a.device, "bf16")
-    base_ppl = float(np.exp(b_nll / b_n))
+    b_nll, b_top = evaluate(model, ids, a.window, a.device, "bf16")
+    base_ppl = float(np.exp(b_nll.mean()))
 
     table = quant.UNIFORM_INT4 if a.uniform else quant.BLOCK_FMT
     print(f"\n--- applying {'UNIFORM INT4 (ablation)' if a.uniform else 'the recipe'} ---")
     cov = quantize_(model, table)
 
     print("\n--- quantized ---")
-    q_nll, q_n, q_top = evaluate(model, ids, a.window, a.device, "quant")
-    quant_ppl = float(np.exp(q_nll / q_n))
+    q_nll, q_top = evaluate(model, ids, a.window, a.device, "quant")
+    quant_ppl = float(np.exp(q_nll.mean()))
     agree = float((b_top == q_top).mean())
+    ci = bootstrap_delta(b_nll, q_nll, a.window - 1)
 
     per = cov["per_block"]
     applied_res = sum(v[1] for v in per.values()) / sum(v[0] for v in per.values())
@@ -354,14 +428,16 @@ def main() -> int:
     expect_res = (sum(b.total * q(b.name).bits for b in spec.blocks)
                   / spec.total_params)
 
-    rc = report(base_ppl, quant_ppl, agree, applied_res, expect_res, active_bits)
+    rc = report(base_ppl, quant_ppl, agree, applied_res, expect_res, active_bits,
+                ci=ci, n_tok=b_nll.size, corpus=corpus_name)
 
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(json.dumps({
-        "model": a.model, "uniform": a.uniform,
-        "tokens": int(b_n), "window": a.window,
+        "model": a.model, "uniform": a.uniform, "corpus": corpus_name,
+        "tokens": int(b_nll.size), "window": a.window,
         "ppl_bf16": base_ppl, "ppl_quant": quant_ppl,
         "ppl_delta": quant_ppl - base_ppl,
+        "ppl_delta_ci95": list(ci),
         "top1_agreement": agree,
         "avg_bits_active": active_bits,
         "avg_bits_resident_applied": applied_res,
