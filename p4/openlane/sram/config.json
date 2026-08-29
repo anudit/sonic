@@ -13,10 +13,10 @@
   "CLOCK_PORT": "clk",
   "CLOCK_PERIOD": 1000.0,
   "FP_SIZING": "absolute",
-  "DIE_AREA": "0 0 700 700",
-  "CORE_AREA": "10 10 690 690",
-  "PL_TARGET_DENSITY": 0.72,
-  "// die": "Enlarged from 600x650 (CORE 590x640, 364,174 um2) after a real run measured 108.061% utilization there (384,724 um2 movable insts, 27,256 total / 21,668 movable, GPL-0301) -- the original floorplan was sized before ADDR_WIDTH=8's real cell count was known. 700x700 (CORE 690x690, ~462k-476k um2) targets ~80% utilization with margin.",
+  "DIE_AREA": "0 0 1000 1000",
+  "CORE_AREA": "10 10 990 990",
+  "PL_TARGET_DENSITY": 0.45,
+  "// die": "700x700/0.72 (2nd attempt, fixing the original 600x650/108% GPL-0301 failure) got past global placement but failed DETAILED placement post-CTS (DPL-0036), preceded by DPL-0035 hold/fanout buffer-count warnings hitting the 1000-buffer limit: ~80% initial utilization left no room for the CTS/hold resizer's inserted buffers to legalize into. This is the same class of problem as the router's own '40% utilisation leaves the router room' comment in config.json -- initial placement density has to leave real headroom for what CTS and the resizer add afterward, not just fit the synthesized cell count. 1000x1000 core at PL_TARGET_DENSITY=0.45 mirrors the router's margin (its working config uses FP_CORE_UTIL=40/PL_TARGET_DENSITY_PCT=45) rather than re-guessing a tighter number a third time.",
   "DESIGN_IS_CORE": 0,
   "// keys": "LibreLane errors on unrecognised config keys. Only keys beginning with // are exempt."
 }
