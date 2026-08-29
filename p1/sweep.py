@@ -26,6 +26,30 @@ from sonic import SKUS, load  # noqa: E402
 from sonic.moe import occupancy, route_counts  # noqa: E402
 from sonic.roofline import area, decode, prefill, sram_for_chunk  # noqa: E402
 
+REAL_TRACE = Path("p0/out/real_routing.npz")
+
+
+def real_occupancy_by_tile(trace_path: Path = REAL_TRACE, n_experts: int = 32) -> dict[int, float]:
+    """Occupancy at each candidate sub-tile edge, from ACTUAL measured routing
+    decisions (p0/out/real_routing.npz, 16,104 real token-expert assignments,
+    CV 0.163) rather than a synthetic lognormal imbalance model. One real
+    "chunk" per captured layer (732 tokens each, 22 layers)."""
+    import numpy as np
+    d = np.load(trace_path)
+    layer_keys = [k for k in d.files if k.startswith("layer_")]
+    out: dict[int, list[float]] = {}
+    for tile in (32, 45, 64, 90, 128):
+        occs = []
+        for k in layer_keys:
+            sel = d[k]  # [tokens, top_k] real expert indices
+            counts = np.zeros(n_experts, dtype=np.int64)
+            for row in sel:
+                for e in row:
+                    counts[e] += 1
+            occs.append(occupancy(counts, tile))
+        out[tile] = float(np.mean(occs))
+    return out
+
 TARGET_TTFT_MS = 250.0   # P1 gate at a 2048-token prompt
 TARGET_OCC = 0.80        # P1 gate under measured routing imbalance
 
@@ -62,8 +86,16 @@ def main() -> int:
     ap.add_argument("--model", default="lfm2.5-8b-a1b")
     ap.add_argument("--sku", default="B", choices=list(SKUS))
     ap.add_argument("--prompt", type=int, default=2048)
-    ap.add_argument("--imbalance", type=float, default=0.5,
-                    help="routing load CV; 0.0 = uniform, P0 supplies the real value")
+    ap.add_argument("--imbalance", type=float, default=0.1634,
+                    help="routing load CV; 0.0 = uniform. Default is the real "
+                         "measured value from p0/out/real_routing.npz (16,104 "
+                         "decisions, P3-1) -- see also --real-trace for a run "
+                         "against the actual captured counts, not a lognormal fit.")
+    ap.add_argument("--real-trace", type=Path, default=None,
+                    help="path to a real_routing.npz; if given, also prints "
+                         "occupancy computed directly from real captured "
+                         "counts (not the synthetic imbalance model) at each "
+                         "candidate tile edge")
     a = ap.parse_args()
 
     model, base = load(a.model), SKUS[a.sku]
@@ -94,6 +126,14 @@ def main() -> int:
         print("NO configuration meets both gates at this routing imbalance.")
         print("Escalate: larger chunk (more SRAM), better ragged packing, or")
         print("push plan section 06 change 2 (shared always-on expert).")
+
+    if a.real_trace:
+        real_occ = real_occupancy_by_tile(a.real_trace)
+        print(f"\nReal-data check ({a.real_trace}, 22 real captured layers, "
+              f"732 tokens/layer -- not the synthetic imbalance model above):")
+        for tile, occ in sorted(real_occ.items()):
+            print(f"  tile={tile:>4}  occupancy={occ:.3f}  "
+                  f"{'PASS' if occ >= TARGET_OCC else 'occ'} (gate >= {TARGET_OCC:.2f})")
     return 0
 
 

@@ -291,6 +291,40 @@ here.
    Decision (T1.3): With 0.05 bits of headroom left (4.700 of 4.75), packer compensation
    cannot close a 20x gap; the format gate is renegotiated to top-1 agreement (>0.99)
    where the model is confident, preserving the 4.70 bits/weight silicon area and SKU budget.
+
+   **T1.1 re-run at 65,504 tokens, all three packers** (`p0/out/gates_{rtn,gptq,awq}_64k.json`),
+   the token count T1.1 asked for so the CIs would have a chance of not
+   spanning zero:
+
+   | pack | `ppl_delta` | 95% CI | top1 (p>0.9) |
+   |---|---:|---:|---:|
+   | RTN  | +1.872 | `[+0.943, +2.808]` | 0.9930 |
+   | AWQ  | +2.973 | `[+1.792, +3.998]` | 0.9955 |
+   | GPTQ | +3.644 | `[+2.709, +4.638]` | 0.9951 |
+
+   All three CIs now exclude zero (the 16K RTN interval did not). The
+   ranking on `ppl_delta` is clean at the point estimate (RTN < AWQ < GPTQ),
+   but only RTN-vs-GPTQ is a clean interval separation (overlap only in a
+   thin `[2.71, 2.81]` sliver); AWQ's interval overlaps substantially with
+   both neighbors, so AWQ cannot be cleanly ranked against either. What *is*
+   resolved: **RTN — the cheapest packer, no calibration pass at all — has
+   the best `ppl_delta` of the three**, the opposite of what a
+   theoretically-better compensation scheme (GPTQ, AWQ) would suggest. The
+   16K-token finding "do not quote +3.11 vs +2.09 as a ranking" no longer
+   holds for RTN-vs-GPTQ; more data resolved the direction.
+
+   All three clear the renegotiated top-1-agreement gate (0.9930 / 0.9955 /
+   0.9951, all >0.99), so the T1.3 decision above is unaffected regardless
+   of packer choice. Given that, and that RTN is both the best-measured and
+   the cheapest to run, **decided: RTN is the shipping packer.** `--pack
+   rtn` is already every script's default (`p0/gates.py`, `p0/bench_drop.py`)
+   and needs no further code change; this closes the packer question that
+   T1.1/T1.3 opened. GPTQ and AWQ remain implemented and tested (see
+   `tests/test_quant.py`) as fallback paths if a future format change moves
+   the `ppl_delta` gate back into reach, but neither is used to produce the
+   shipping quantized weights. `ppl_delta` itself still misses 0.15 by
+   more than an order of magnitude for all three — that was never in
+   question and 65K tokens does not change it.
 1. **Measure the drafter's acceptance rate** on representative workloads. It is
    now the only free variable in the speculative-decode budget: at p = 0.80 the
    gain is 1.61x, at p = 0.90 it is 2.36x. Needs the DSpark checkpoint.

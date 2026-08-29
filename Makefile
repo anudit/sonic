@@ -40,7 +40,7 @@ p0-accbound:
 # --- P1: architecture model ---
 p1:
 	@python3 p1/occupancy.py
-	@python3 p1/sweep.py --imbalance 0.5
+	@python3 p1/sweep.py --real-trace p0/out/real_routing.npz
 
 # --- P2: unit RTL, differential benches, PPA loop ---
 p2: build/sonic_golden.o
@@ -87,6 +87,12 @@ p2-units: build/sonic_golden.o
 	  $(MAKE) -C build/obj_$$u -f Vsonic_$$u.mk $(AR_FIX) -j8 >/dev/null 2>&1; \
 	  printf "  sonic_%-8s " "$$u"; ./build/obj_$$u/Vsonic_$$u | tail -1; \
 	done
+	@rm -rf build/obj_vec
+	@verilator --cc --exe -O2 -Wno-fatal -Ip2/rtl \
+	  --Mdir build/obj_vec --top-module sonic_vec \
+	  p2/rtl/sonic_vec.sv p2/tb/tb_vec.cpp >/dev/null 2>&1
+	@$(MAKE) -C build/obj_vec -f Vsonic_vec.mk $(AR_FIX) -j8 >/dev/null 2>&1
+	@printf "  sonic_%-8s " "vec"; ./build/obj_vec/Vsonic_vec | tail -1
 
 # Router RTL driven by REAL tensors from the 8.47B checkpoint.
 p2-router: p2/vectors/router_l5.bin

@@ -277,6 +277,16 @@ max-cap. The clock net has 1,586 terminals.
 
 **T2.4 — Reconcile 461 vs 99 levels for the router**, or retire one of them.
 - *Accept:* one number, one method, stated; `p2/README.md` Finding 16 updated.
+- *Partial progress:* re-ran `p2/ppa/loop.py --unit sonic_router` at the
+  `REQUIRED_DEFINES` default (`ROUTER_LANES=4`, `ROUTER_PWL_SEGS=8`) and
+  reproduced **114 levels, 67,467 cells, 1,864 DFFs** exactly — this is a
+  real, reproducible number, matching what a since-superseded summary had
+  claimed. It is a third data point, not a reconciliation: 461 and 99 were
+  both reportedly at `LANES=64` (combinational vs. `-dff` pipelined), and
+  this run is at `LANES=4`. A same-LANES comparison still needs a `LANES=64`
+  run, which is exactly the configuration HANDOFF Part 2 already documented
+  as not converging in 35 minutes at `LANES=16` -- `LANES=64` is presumed
+  worse and was not attempted in this environment. Still open.
 
 ### Tier 3 — the chip that has not been written
 

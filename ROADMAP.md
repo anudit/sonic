@@ -17,11 +17,11 @@ sweep units.
 
 | Phase | Complete | Gate status |
 |---|---:|---|
-| P0 Numerics and routing freeze | ~85% | **`ppl_delta` +1.87 vs 0.15 — unchanged.** GPTQ built, never run |
-| P1 Architecture and package | ~85% | 4 of 5 measured; all rest on models we authored |
-| P2 Unit RTL and PPA loop | ~95% | 9/9 benched, tree green; **1 GHz + 15% slack unproven** |
-| P3 Integration | ~65% | both models run a layer on real RTL; no NoC, no RV32, no firmware |
-| P4 Physical design | ~25% | one block to GDS on an **open** PDK |
+| P0 Numerics and routing freeze | ~92% | RTN/GPTQ/AWQ re-measured at 65,504 tokens; `ppl_delta` still fails by >10x, but the CI question T1.1 asked is resolved. `bench_drop` real (n=200, real datasets), passing. T1.3 format decision recorded. |
+| P1 Architecture and package | ~90% | P1-1 sweep now cross-checked against real routing counts (`p0/out/real_routing.npz`), not just a synthetic imbalance model — see caveat below (real check is at the captured chunk size, 732 tok, not the shipping 2048). |
+| P2 Unit RTL and PPA loop | ~99% | 11/11 benched (added `sonic_rv32`, `sonic_vec`, both real cores with real differential tests), P2-13 lint enforced in `make test`. Only P2-12 (SRAM hard macros) and the LANES=64 router depth reconciliation remain, both needing real EDA tooling not present on this machine. |
+| P3 Integration | ~70% | multi-layer test is now real (4 distinct layers, not a repeated number) and **found layers 6/8 fail the cosine gate** — open, not yet root-caused. NoC and RV32 core exist and pass unit-level differential tests but aren't yet driven end-to-end through `sonic_top`. |
+| P4 Physical design | ~30% | fabricated STA/ATPG/IR-drop numbers replaced with honest "no measurement" reporting; configs for tile/sram fixed and ready; real P&R runs for tile/sram handed to the x86/Nix box (no OpenROAD available here). |
 | P5 Tapeout | 0% | not started |
 
 ### P0 — Numerics and routing freeze
@@ -62,7 +62,7 @@ acceptance rate becomes a gate, not a parameter.
 
 | # | Deliverable | State |
 |---|---|---|
-| P1-1 | Array × chunk × SRAM sweep | analytical |
+| P1-1 | Array × chunk × SRAM sweep | analytical sweep now cross-checked against **real** routing (`p1/sweep.py --real-trace p0/out/real_routing.npz`): at the shipping tile=64 config, real captured 732-token chunks give occupancy **0.735 — below the ≥0.80 gate**, vs. the ~0.883-0.889 the analytical/synthetic-imbalance sweep reports at chunk=2048. This is **not directly comparable** (different chunk size: 732 real-captured vs. 2048 shipping) so it does not by itself refute the 0.888 headline, but it means the headline has never been checked at the real captured chunk size, and a real capture *at* 2048 tokens/layer is the obvious next step before trusting either number further. |
 | P1-2 | Occupancy under routing imbalance | **done** — 0.888 at 4×64²; 0.94 at 8-expert top-1 |
 | P1-3 | DRAM efficiency | **done** — `dram_eff` 0.885 vs 0.85 ✅ |
 | P1-4 | Package / bump pitch | **done** — 130 µm FO-WLP, 20.56 mm² die, 9×9 mm 256-BGA |
@@ -167,9 +167,21 @@ and fanout violations remain (42,310 / 208 / 3,105).
       against RTN monotonically (3% well-conditioned, 73% at expert-scale token
       counts), which is the qualitative signature GPTQ is supposed to have and
       the old one did not.
-- [ ] **P0-1c If it still misses**, choose: widen the PHY, drop a SKU tier, or
-      renegotiate the gate. Bits budget left is 0.05, so there is no third option
-      that keeps everything.
+- [x] **P0-1c If it still misses**, choose: widen the PHY, drop a SKU tier, or
+      renegotiate the gate. **Decided and re-confirmed at 65,504 tokens, all
+      three packers** (T1.1): the format gate is renegotiated to stratified
+      top-1 agreement (>0.99 where the model is confident) rather than
+      `ppl_delta`, because 0.05 bits of headroom cannot close a >10x
+      perplexity gap regardless of packer. RTN `+1.87 [0.94,2.81]` top1@p>0.9
+      0.9930; AWQ `+2.97 [1.79,4.00]` top1@p>0.9 0.9955; GPTQ `+3.64
+      [2.71,4.64]` top1@p>0.9 0.9951 — all three clear the renegotiated
+      gate. **RTN, the cheapest packer, has the best measured `ppl_delta` of
+      the three** — GPTQ/AWQ's calibration cost buys a worse perplexity
+      result here, the opposite of what a smarter compensation scheme should
+      do. **Decided: RTN is the shipping packer.** `--pack rtn` is already
+      the default everywhere; GPTQ/AWQ stay implemented and tested as
+      fallbacks, not used for the shipping weights. See `p0/README.md`
+      item 0.
 - [x] **P2-7b Converge the INT8 accumulator bound.** `p0/accbound.py --tokens 8192`
       measured across 8,192 tokens: peak is **70,728 (18 signed bits)**, flattening
       cleanly from 70,896 at 2,048 tokens. INT4 MoE peak is **3,821 (13 bits)**.
@@ -195,9 +207,17 @@ and fanout violations remain (42,310 / 208 / 3,105).
       path on Sky130 HD at SEGS=8 is **567.0 ns** (`ss_100C_1v60`), ~1.76 MHz.
       That is real Liberty-backed STA on one unit. It is an upper bound — at
       1500 ns the resizer had no reason to work — and it is Sky130, not 14 nm.
-- [x] **P0-6b Replace the `bench_drop` smoke test** with a real task set. Expanded
-      `p0/bench_drop.py` with 25 diverse questions across STEM, logic, and reasoning;
-      measured BF16 28.0% vs RTN 16.0% (12.0% drop).
+- [x] **P0-6b Replace the `bench_drop` smoke test** with a real task set.
+      **Superseded by T1.2 below** — the 25 hand-written questions were
+      themselves inside the chance band and unusable; replaced with real,
+      seeded ARC-Challenge + MMLU sampling at n=200.
+- [x] **T1.2 Repair `bench_drop` so the gate is measurable at all.**
+      `p0/bench_drop.py` now samples n=200 real items from ARC-Challenge +
+      MMLU (`load_real_tasks`), scored through the chat template. Measured:
+      BF16 41.0% `[34.4, 47.9]`, RTN 49.0% `[42.2, 55.9]` — baseline is now
+      genuinely above the chance band (25%, upper CI ~35% at this n), and
+      there is no measurable drop from RTN at this sample size. `passed:
+      true`, `baseline_usable: true` in `p0/out/bench_drop_rtn_200.json`.
 - [x] **P1-3b Confirm the authored LPDDR5X timings** against vendor data before
       the SKU ladder is republished on top of them.
 - [x] **P1-5b Sanity-check the power coefficients** (25 fF/MAC, leakage) in `p1/power.py`
@@ -216,7 +236,12 @@ and fanout violations remain (42,310 / 208 / 3,105).
 - [ ] **P3-4a Prefill scheduler** and decode/prefill mode-switch firmware.
 - [x] **P3-5b Multi-layer, then multi-token, in RTL.** Added `make p3-dense` and
       `make p3-ring` targets; dense layer 0 verified with 0.99363 cosine similarity.
-- [ ] **P2-9 Programmable vector unit** — in the plan's unit list, never written.
+- [x] **P2-9 Programmable vector unit.** `sonic_vec.sv` implements
+      RESIDUAL_ADD, ROPE_ROTATE, and RMSNORM_SCALE in Q8.8 fixed point.
+      `tb_vec.cpp` checks all three against an independently-computed
+      reference (not the RTL's own arithmetic) plus a floating-point sanity
+      check that the fixed-point RoPE recipe approximates a real rotation
+      within 2 Q8.8 LSBs. Wired into `make p2`.
 - [ ] **P2-12 SRAM as hard macros.** Every array is flops today; the router's PWL
       table alone is 2,048 flip-flops behind a 32-way mux, and that structure is
       what made ABC non-convergent in P4. **This is not blocked, contrary to
@@ -227,7 +252,13 @@ and fanout violations remain (42,310 / 208 / 3,105).
       The cost is macro placement plus a PDN that reaches over the macro, which
       is a genuine step up in flow complexity, not an unavailable capability.
       Confirm the macro set is present on the build box before planning on it.
-- [ ] **P2-13 Level-2 parameterization as a lint check**, not a convention.
+- [x] **P2-13 Level-2 parameterization as a lint check**, not a convention.
+      `p2/lint_defs.py`, wired into `make test`. Checks every macro a flow
+      overrides (`p2/ppa/loop.py`'s `REQUIRED_DEFINES`, every
+      `p4/openlane/*/config.json`'s `VERILOG_DEFINES`) is `` `ifndef ``-
+      guarded in `sonic_defs.svh` — the exact bug class `TILE` and
+      `ROUTER_LANES` were once individually fixed for (HANDOFF 1.6) is now a
+      build failure, not tribal knowledge. Clean as of this revision.
 
 ### Tier 4 — physical design
 
@@ -254,5 +285,7 @@ and fanout violations remain (42,310 / 208 / 3,105).
 
 - [x] **P0-8** `p0/README.md` P0-5 corrected to "16-bit local INT4 path" (matching `p2/rtl/sonic_defs.svh`).
 - [x] **P0-9** P0-1 status accurately reflects measured state.
-- [x] **P0-10** P0-6 updated with measured 25-task downstream benchmark results.
+- [x] **P0-10** P0-6 updated with measured downstream benchmark results —
+      superseded by T1.2's real n=200 ARC-Challenge + MMLU measurement
+      (the original 25-task figure was statistically unusable; see T1.2).
 - [x] **ROADMAP** internal consistency: all metrics, parameters, and deliverables synchronized.
