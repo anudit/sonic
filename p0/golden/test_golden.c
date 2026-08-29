@@ -99,12 +99,75 @@ static void test_softmax_tiling(void) {
     }
 }
 
+static void test_golden_gemv(void) {
+    printf("golden INT4 GEMV and 1D convolution\n");
+    enum { M = 8, K = 64 };
+    int8_t x[K], w[M * K];
+    float scales[M];
+    for (int k = 0; k < K; k++) x[k] = (int8_t)((k % 15) - 7);
+    for (int m = 0; m < M; m++) {
+        scales[m] = 0.5f;
+        for (int k = 0; k < K; k++) w[m * K + k] = (int8_t)(((m + k) % 9) - 4);
+    }
+    float y[M];
+    sonic_golden_gemv_int4(x, w, scales, y, M, K, 64);
+    for (int m = 0; m < M; m++) {
+        int32_t exp = 0;
+        for (int k = 0; k < K; k++) exp += (int32_t)w[m * K + k] * x[k];
+        float exp_f = (float)exp * 0.5f;
+        CHECK(fabsf(y[m] - exp_f) < 1e-4f, "GEMV m=%d: got %.2f want %.2f", m, y[m], exp_f);
+    }
+
+    int8_t conv_k[4 * 3] = {1, 2, 1,  2, -1, 1,  -2, 0, 2,  1, 1, 1};
+    int8_t conv_x[4 * 3] = {3, 2, 1,  1,  1, 1,   2, 2, 2,  0, 1, 2};
+    int32_t conv_y[4];
+    sonic_golden_conv1d(conv_x, conv_k, conv_y, 4, 3);
+    CHECK(conv_y[0] == 8, "conv 0: got %d want 8", conv_y[0]);
+    CHECK(conv_y[1] == 2, "conv 1: got %d want 2", conv_y[1]);
+    CHECK(conv_y[2] == 0, "conv 2: got %d want 0", conv_y[2]);
+    CHECK(conv_y[3] == 3, "conv 3: got %d want 3", conv_y[3]);
+}
+
+static void test_golden_moe_layer_run(void) {
+    printf("golden whole MoE layer forward\n");
+    sonic_layer_config_t cfg = {
+        .num_experts = 4,
+        .top_k = 2,
+        .hidden_dim = 64,
+        .intermediate_dim = 64
+    };
+    int8_t x[64];
+    int8_t router_w[4 * 64];
+    int8_t gate_up_w[4 * (2 * 64) * 64];
+    int8_t down_w[4 * 64 * 64];
+    float gu_scales[4 * 128 * 1];
+    float dn_scales[4 * 64 * 1];
+    float y[64];
+
+    for (int i = 0; i < 64; i++) x[i] = (int8_t)((i % 7) - 3 + 2);
+    for (int i = 0; i < 4 * 64; i++) router_w[i] = (int8_t)((i % 5) - 2);
+    for (int i = 0; i < 4 * 128 * 64; i++) gate_up_w[i] = (int8_t)((i % 9) - 4);
+    for (int i = 0; i < 4 * 64 * 64; i++) down_w[i] = (int8_t)((i % 7) - 3);
+    for (int i = 0; i < 4 * 128; i++) gu_scales[i] = 0.1f;
+    for (int i = 0; i < 4 * 64; i++) dn_scales[i] = 0.1f;
+
+    sonic_golden_moe_layer(x, router_w, gate_up_w, gu_scales, down_w, dn_scales, y, &cfg);
+    int non_zero = 0;
+    for (int i = 0; i < 64; i++) {
+        if (fabsf(y[i]) > 1e-4f) non_zero++;
+    }
+    CHECK(non_zero > 0, "MoE layer output all zeros");
+}
+
 int main(void) {
     printf("Sonic S1 golden-model directed tests\n\n");
     test_accum_bound_all_depths();
     test_ragged_reduction();
     test_pwl();
     test_softmax_tiling();
+    test_golden_gemv();
+    test_golden_moe_layer_run();
     printf("\n%s (%d failures)\n", fails ? "FAILED" : "PASSED", fails);
     return fails ? 1 : 0;
 }
+

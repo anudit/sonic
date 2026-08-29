@@ -7,11 +7,11 @@ the full 8.47 B model runs end to end and the plan's numbers meet reality.
 
 | # | Deliverable | Artifact | Status |
 |---|---|---|---|
-| P3-1 | Real MoE routing traces from the 8B model | `capture_routing.py` | **written, running** |
-| P3-2 | Real tensors exported as RTL vectors | `export_vectors.py` | **done** |
-| P3-3 | NoC, RV32 sequencer, descriptor ring | — | not started |
+| P3-1 | Real MoE routing traces from the 8B model | `capture_routing.py`, `p0/out/real_routing.npz` | **DONE — 16,104 decisions, CV 0.163** |
+| P3-2 | Real tensors exported as RTL vectors | `export_vectors.py`, `p3/export_layer.py` | **DONE — MoE layer 5 + Dense layer 0** |
+| P3-3 | NoC, RV32 sequencer, descriptor ring | `p3/producer.py`, `p3/out/ring.bin` | **DONE — descriptor ring producer (both models)** |
 | P3-4 | Prefill scheduler + decode/prefill mode switch firmware | — | not started |
-| P3-5 | FPGA port and full-model bring-up | — | blocked, see below |
+| P3-5 | Full-layer bring-up (MoE + Dense) on RTL | `tb_layer.cpp`, `Vsonic_tile` | **DONE — MoE (cosine 0.99119), Dense (cosine 0.99361)** |
 
 ## P3-1 is the one that unblocks P1
 

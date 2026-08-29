@@ -75,4 +75,28 @@ void  sonic_softmax_init(sonic_softmax_t *s);
 void  sonic_softmax_update(sonic_softmax_t *s, const float *scores, size_t n,
                            float *acc, const float *values, size_t d);
 
+/* --- whole-layer golden models (P0-4a integration reference) ------------
+ * End-to-end layer references combining routing, GEMV, PWL, and accumulation.
+ */
+typedef struct {
+    int   num_experts;
+    int   top_k;
+    int   hidden_dim;
+    int   intermediate_dim;
+} sonic_layer_config_t;
+
+/* INT4 group-64 quantized matrix-vector multiply with FP16 scale */
+void sonic_golden_gemv_int4(const int8_t *x, const int8_t *w, const float *scales,
+                            float *y_out, size_t M, size_t K, size_t group);
+
+/* 1D short convolution (depthwise across channels) */
+void sonic_golden_conv1d(const int8_t *x, const int8_t *k, int32_t *y_out,
+                         size_t channels, size_t kernel_size);
+
+/* Full MoE layer golden forward: router -> gate/up -> SiLU PWL -> down -> combine */
+void sonic_golden_moe_layer(const int8_t *x, const int8_t *router_w,
+                            const int8_t *gate_up_w, const float *gate_up_scales,
+                            const int8_t *down_w, const float *down_scales,
+                            float *y_out, const sonic_layer_config_t *cfg);
+
 #endif /* SONIC_GOLDEN_H */

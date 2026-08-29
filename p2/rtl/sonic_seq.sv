@@ -16,7 +16,7 @@
 
 module sonic_seq #(
   parameter int DW    = 64,      // descriptor width
-  parameter int DEPTH = 256
+  parameter int DEPTH = 512      // supports full 301-descriptor ring for 8B model
 ) (
   input  logic              clk,
   input  logic              rst_n,
@@ -47,19 +47,50 @@ module sonic_seq #(
 
   always_ff @(posedge clk) if (wr_en) ring[wr_addr] <= wr_data;
 
+  // `desc` is REGISTERED alongside desc_vld, not driven combinationally from
+  // ring[pc].
+  //
+  // The first version did the latter, and p2/tb/tb_seq.cpp caught what that
+  // costs: desc_vld is set in the same cycle pc increments, so the k-th cycle
+  // with desc_vld high presented ring[k+1]. Descriptor 0 was never issued at
+  // all, every descriptor ran one slot early against its own valid, and the
+  // last valid cycle read ring[len] -- past the end of the program, emitting
+  // whatever firmware happened to leave in the next ring slot.
+  //
+  // Nothing downstream can detect this. Every descriptor is well-formed; they
+  // are just the wrong ones, and the fetch they issue is a correct fetch of the
+  // wrong tensor. It is the exact failure class the streamer bench pinned a
+  // contract for one block over: right data, wrong cycle.
+  logic [DW-1:0] raw, patched;
+  assign raw     = ring[pc];
+  assign patched = (raw[DW-1:DW-4] == OP_EXPERT)
+                 ? {raw[DW-1:`EXPERT_BITS], patch_q}
+                 : raw;
+
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      pc <= '0; busy <= 1'b0; desc_vld <= 1'b0; done <= 1'b0; patch_q <= '0;
+      pc <= '0; busy <= 1'b0; desc_vld <= 1'b0; done <= 1'b0;
+      patch_q <= '0; desc <= '0;
     end else begin
       done     <= 1'b0;
       desc_vld <= 1'b0;
 
       if (patch_vld) patch_q <= patch_expert;
 
-      if (start) begin
+      // len == 0 is a firmware error. Ignoring the start beats replaying the
+      // whole ring, which is what `pc == len - 1` would do once len-1 wraps to
+      // DEPTH-1.
+      if (start && len != '0) begin
         pc <= '0; busy <= 1'b1;
       end else if (busy) begin
+        // Splice the routed expert in on the way out, so the fetch issues in
+        // the same cycle it would have without MoE. The router is a 2048->32
+        // GEMV and its decision is invisible against the 343 us it takes to
+        // stream one layer's experts, so no prefetch bubble appears here.
+        // patch_q is read before this cycle's patch_vld lands, so a patch
+        // arriving with a descriptor applies from the NEXT descriptor.
         desc_vld <= 1'b1;
+        desc     <= patched;
         if (pc == len - 1) begin
           busy <= 1'b0;
           done <= 1'b1;
@@ -68,15 +99,5 @@ module sonic_seq #(
       end
     end
   end
-
-  // Splice the routed expert into the descriptor on its way out, so the fetch
-  // issues in the same cycle it would have without MoE. The router is a
-  // 2048->32 GEMV and its ~200 ns decision is invisible against the 343 us it
-  // takes to stream one layer's experts, so no prefetch bubble appears here.
-  logic [DW-1:0] raw;
-  assign raw  = ring[pc];
-  assign desc = (raw[DW-1:DW-4] == OP_EXPERT)
-              ? {raw[DW-1:`EXPERT_BITS], patch_q}
-              : raw;
 
 endmodule

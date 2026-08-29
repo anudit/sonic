@@ -34,20 +34,32 @@ after Efabless shut down. `github:efabless/openlane2` no longer resolves.
 
 ## Status
 
+**One block is through the flow end to end.** `sonic_router` reached GDS on
+2026-08-28 with clean DRC, LVS, antenna and timing signoff — see
+[RESULTS.md](RESULTS.md) for the metrics, the caveats, and what the run
+demanded of the RTL.
+
 | Step | State |
 |---|---|
-| KLayout viewer | installed (local render also done in CI) |
+| KLayout viewer | installed; 0.26.2 segfaults on `.py` macros, use >= 0.30 |
 | Yosys synthesis | works (198,703 cells at LANES=64) |
 | Sky130 PDK | fetched by LibreLane on first run (`volare`) |
-| LibreLane on CI | `.github/workflows/router-gds.yml` |
-| `sonic_router` config | written, `p4/openlane/router/config.json` |
+| LibreLane on CI | `.github/workflows/router-gds.yml` (disabled) |
+| `sonic_router` config | `p4/openlane/router/config.json`, matching the run that finished |
+| `sonic_router` GDS | **done** — 4 h 40 min, 80/80 stages, DRC/LVS/antenna clean |
+| results | `p4/openlane/router/results/segs8/` |
 
 ## Sizing note
 
 `sonic_router` at the shipping LANES=64 is ~199k cells. On Sky130 that is a
-multi-hour run. `config.json` therefore builds **LANES=16** by default: same
-structure, same routing character, roughly a quarter the multiplier array, and a
-run that finishes in well under an hour. Raise it once the flow is proven.
+multi-hour run. `config.json` builds **LANES=4**, which is what the completed
+run used: same structure, same routing character, 1/16 the multiplier array.
+
+`LANES` was never the tractability knob, though — `ROUTER_PWL_SEGS` is. At
+SEGS=64 the sigmoid table is 4,096 flip-flops behind a 64-way 32-bit mux, and
+ABC does not converge on it: two attempts, one killed at 2 h and one at ~11 h of
+CPU. SEGS=8 clears synthesis in 2 h. That is a finding about the RTL, not about
+the tool — see RESULTS.md.
 
 ## What a full-chip layout would need, and why it is not this
 

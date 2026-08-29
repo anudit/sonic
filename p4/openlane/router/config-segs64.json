@@ -1,0 +1,27 @@
+{
+  "DESIGN_NAME": "sonic_router",
+  "VERILOG_FILES": [
+    "dir::../../../p2/rtl/sonic_router.sv"
+  ],
+  "VERILOG_INCLUDE_DIRS": [
+    "dir::../../../p2/rtl"
+  ],
+  "VERILOG_DEFINES": [
+    "ROUTER_PWL_SEGS=64"
+  ],
+  "SYNTH_PARAMETERS": [
+    "LANES=4"
+  ],
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 1500,
+  "FP_CORE_UTIL": 40,
+  "PL_TARGET_DENSITY_PCT": 45,
+  "FP_ASPECT_RATIO": 1,
+  "RUN_HEURISTIC_DIODE_INSERTION": true,
+  "GRT_ALLOW_CONGESTION": true,
+  "// clock": "1500 ns carried over from the SEGS=8 run for the same reason: the top-k cone's critical path dominates regardless of SEGS, so the same margin should hold here too.",
+  "// lanes": "LANES=4, matching the SEGS=8 run for a like-for-like comparison.",
+  "// segs": "ROUTER_PWL_SEGS=64 experiment: with sonic_router.sv now using the tournament-tree top-k (461 levels, 7.6% fewer cells vs the old serial scan), re-testing whether ABC's earlier 2+ hour non-convergence at SEGS=64 was actually caused by the top-k depth rather than SEGS itself. If this clears synthesis in reasonable time, SEGS=64 (matching the real 1024-bit PWL table) is preferable to SEGS=8 for representativeness.",
+  "// util": "40% utilisation leaves the router room. The top-k network is a wide combinational cone over a 1024-bit score register and is the congestion hot spot -- and, per the clock note above, also the critical-path hot spot.",
+  "// keys": "LibreLane errors on unrecognised config keys. Only keys beginning with // are exempt, which is why the comments look like this."
+}

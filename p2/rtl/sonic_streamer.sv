@@ -31,7 +31,8 @@ module sonic_streamer #(
   input  logic                          dram_vld,
   output logic                          dram_rdy,
 
-  // One FP16-as-Q16 scale per group of 64 weights.
+  // One group scale factor (in Q8.8 fixed-point format, reset 1.0 = 16'sh0100)
+  // per group of 64 weights.
   input  logic signed [15:0]            grp_scale,
   input  logic                          grp_scale_vld,
 

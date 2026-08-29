@@ -13,7 +13,7 @@
 `define W_BITS     4     // INT4 weights, group-64 scaled
 `define A_BITS     8     // INT8 activations, per-token dynamic
 `ifndef ACC_LOCAL
-  `define ACC_LOCAL 16   // fast path -- 16, NOT 12; see the note below
+  `define ACC_LOCAL 16   // fast path -- 16 bits (guarantees zero overflow on worst-case 16*8*128=16384)
 `endif
 `ifndef ACC_FOLD
   `define ACC_FOLD  16   // products before folding into mid
@@ -22,15 +22,15 @@
 `define ACC_OUT    32
 
 // Local-stage bound: ACC_FOLD * max|w| * max|a| = 16 * 8 * 128 = 16384.
-// That needs 16 bits. A 12-bit local path -- the width the Kimi K3 write-up
-// quotes for its own operand widths -- silently caps |activation| at 15.
-// p2/ppa/loop.py sweeps ACC_LOCAL so the cost of the extra bit is measured
-// rather than assumed.
+// That strictly needs 16 bits signed (+-32768) to guarantee zero overflow under
+// any legal INT4 x INT8 operands.
 
 // --- systolic geometry -----------------------------------------------------
 // P1 (p1/README.md) says sub-tiling beats one monolithic 128x128 array under
 // realistic routing imbalance: occupancy 0.889 vs 0.790 at the same die size.
-`define TILE       64
+`ifndef TILE
+  `define TILE     64
+`endif
 `define N_TILES    4          // 4 x 64^2 = 16,384 lanes
 `define ACC_BANKS  8          // decode 1 | speculative verify ~10 | prefill 2048
 
@@ -53,13 +53,37 @@
 // clears the 0.995 gate. See the table in sonic_router.sv.
 `define ROUTER_A_BITS 12
 `define ROUTER_W_BITS 12
-// Sigmoid PWL resolution. 64, not the 16 the FFN's SiLU uses: measured against
-// 512 real hidden states, 16 segments give 0.971 routing agreement and 32 give
-// 0.990, both under the 0.995 gate. 64 gives 0.996 and 128 buys nothing.
-// Chord fits are also minimax-centred, not endpoint-interpolated -- an endpoint
+`ifndef ROUTER_LANES
+  `define ROUTER_LANES 64
+`endif
+// Sigmoid PWL: 32 segments over [-4, 4). Measured on 512 real hidden states,
+// `make p2-pwl-sweep`, top-4 set agreement against the 8.47 B checkpoint:
+//
+//     range \ segs      8       16       32       64
+//     +-8            0.9102   0.9707   0.9902   0.9961
+//     +-4            0.9707   0.9902   0.9961   0.9961
+//     +-2            0.9590   0.9844   0.9902   0.9941
+//
+// Halving the range is worth exactly one doubling of the segment count -- the
+// +-4 row is the +-8 row shifted one column left -- so 32 segments over +-4
+// buys the same 0.9961 as 64 over +-8 with HALF the table. That halving is not
+// cosmetic: the table is a firmware-writable flop array with a SEGS-way 32-bit
+// read mux, and it is what made ABC non-convergent at 64 in P4 (p4/RESULTS.md).
+//
+// +-2 is where it stops paying: the logits genuinely reach past 2, so the
+// narrower table clips instead of resolving. Range is a lever down to the
+// actual dynamic range and no further -- the same shape finding 20 found on the
+// FFN's SiLU, measured rather than assumed.
+//
+// Chord fits are minimax-centred, not endpoint-interpolated -- an endpoint
 // chord sits entirely above a convex segment and biases every score.
 `ifndef ROUTER_PWL_SEGS
-  `define ROUTER_PWL_SEGS 64
+  `define ROUTER_PWL_SEGS 32
+`endif
+// Half-width of the PWL's input range, in units of the logit. The table spans
+// [-RANGE, RANGE). Must be a power of two -- segment select is a bare shift.
+`ifndef ROUTER_PWL_RANGE
+  `define ROUTER_PWL_RANGE 4
 `endif
 
 `endif

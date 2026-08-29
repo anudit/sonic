@@ -155,3 +155,32 @@ def test_awq_scale_is_per_input_channel_only():
     w = torch.randn(64, 128, dtype=torch.bfloat16)
     s = packer.awq_best_scale(w, 4, 64, torch.rand(128) + 0.1)
     assert s.numel() == w.shape[-1], f"s has {s.numel()} entries, want 128"
+
+
+def test_gptq_without_hessian_falls_back_to_rtn():
+    torch.manual_seed(0)
+    w = torch.randn(32, 128, dtype=torch.bfloat16)
+    assert torch.equal(packer.q_group_gptq(w, 4, 64, None, None), _q_group(w, 4, 64))
+
+
+def test_gptq_preserves_int4_levels():
+    torch.manual_seed(0)
+    w = torch.randn(32, 128, dtype=torch.bfloat16)
+    H = torch.randn(128, 64)
+    H = H @ H.T + torch.eye(128)
+    q = packer.pack(w, quant.INT4_G64, "gptq", {"H": H, "mean": torch.ones(128)})
+    levels = max(len(torch.unique(r)) for r in q.reshape(-1, 64))
+    assert levels <= 16, f"gptq emitted {levels} levels, not INT4"
+
+
+def test_gptq_reduces_weighted_error():
+    torch.manual_seed(0)
+    w = torch.randn(64, 128, dtype=torch.bfloat16)
+    X = torch.randn(256, 128)
+    H = X.T @ X
+    q_rtn = _q_group(w, 4, 64)
+    q_gptq = packer.q_group_gptq(w, 4, 64, H=H)
+    err_rtn = ((w.float() - q_rtn.float()) @ X.T).pow(2).sum().item()
+    err_gptq = ((w.float() - q_gptq.float()) @ X.T).pow(2).sum().item()
+    assert err_gptq <= err_rtn, f"gptq output error {err_gptq:.2f} > rtn {err_rtn:.2f}"
+

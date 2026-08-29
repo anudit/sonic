@@ -11,14 +11,14 @@ first commit.
 | P2-1 | Hierarchical accumulator | `rtl/sonic_acc.sv` | **done, verified** |
 | P2-2 | Dual-mode PE with banked accumulators | `rtl/sonic_pe.sv` | **done, verified** |
 | P2-6 | MoE top-k router | `rtl/sonic_router.sv` | **done, verified vs the 8.47B model** |
-| P2-3 | Differential bench vs. the golden model | `tb/tb_*.cpp` | 8 of 9 units |
+| P2-3 | Differential bench vs. the golden model | `tb/tb_*.cpp` | **9 of 9 units** |
 | P2-4 | Automated PPA loop | `ppa/loop.py` | done |
 | P2-5a | 64x64 dual-mode systolic sub-tile | `rtl/sonic_tile.sv` | **done, verified** |
 | P2-5b | Weight streamer + expert gather | `rtl/sonic_streamer.sv` | **done, verified** |
 | P2-5c | Short-conv unit (k<=7, double-gated) | `rtl/sonic_conv.sv` | **done, verified — bug found** |
 | P2-5d | Online-softmax attention accumulator | `rtl/sonic_softmax.sv` | **done, verified — two bugs found** |
 | P2-5e | Streaming LM head + top-K | `rtl/sonic_lmhead.sv` | **done, verified** |
-| P2-5f | Descriptor-ring sequencer | `rtl/sonic_seq.sv` | done, unverified |
+| P2-5f | Descriptor-ring sequencer | `rtl/sonic_seq.sv` | **done, verified — bug found** |
 
 ## Verification approach: Verilator + the C model in one process
 
@@ -204,26 +204,22 @@ log2(E) deep instead of E-1 deep.
 
 Measured, `LANES=4`, `SEGS=8`:
 
-| top-K structure | depth | cells |
+| top-K structure / flow | depth | cells |
 |---|---:|---:|
-| serial scan (was) | 2,518 | 116,236 |
-| **tournament tree (now)** | **461** | **107,387** |
+| serial scan unpipelined (`-DROUTER_TOPK_SERIAL`) | 2,518 | 116,236 |
+| tournament tree unpipelined (`-DROUTER_TOPK_COMB`) | 461 | 107,387 |
+| **fully pipelined (S1 MAC, S2 acc, E1-E3 PWL, 2-cycle top-K)** | **114** | **67,467** |
 
-**5.5x shallower and 7.6% smaller.** The serial version was strictly worse on
-both axes; there was no tradeoff being made, only a cost being paid. The tree is
-now the default and `make p2-router` reproduces the original numbers exactly —
-top-1 1.0000, top-4 set 0.9961, exact order 0.9902 against the real 8.47 B
-tensors. The old structure is kept behind `-DROUTER_TOPK_SERIAL` for comparison.
-
-461 levels is still far too deep for 1 GHz and the remaining depth is the K
-serially-dependent passes plus the score/PWL datapath ahead of them. That part
-does need pipelining. But the first 5.5x cost nothing.
+**Depth reconciliation:** 2,518 was the unpipelined serial-scan cone; 461 was the
+unpipelined tournament tree combinational cone. Pipelining the MAC tree,
+epilogue scales, PWL evaluation, and splitting top-K across two cycles reduces
+the longest critical path through the block to **114 levels** under `abc -g cmos2 -dff`
+(67,467 cells, 1,864 DFFs).
 
 **Why this was not caught sooner:** `sonic_router` was missing from `UNITS` in
 `ppa/loop.py`. The one unit with a pathological critical path was the one unit
 excluded from the loop built to measure critical paths. It is in the table now,
-though outside the default sweep — even at `SEGS=8` it takes minutes under
-`abc -g cmos2 -dff`, so run it deliberately:
+run via:
 
 ```
 python3 p2/ppa/loop.py --unit sonic_router
@@ -381,6 +377,103 @@ Also worth reconciling: the port comment says the scale is "FP16-as-Q16", but th
 reset value is `16'sh0100` = 256, which is 1.0 only in Q8.8. A 16-bit Q16 cannot
 represent 1.0 at all. One of the two is wrong.
 
+## Finding 22: the sequencer issued every descriptor one slot late
+
+`sonic_seq` was the last unbenched unit and the one `ppa/loop.py` files as
+"control, not datapath; f_max here is irrelevant" — which is precisely why the
+thing it needed was a bench, not a timing number.
+
+`desc` was driven combinationally from the program counter while `desc_vld` was
+registered:
+
+```systemverilog
+desc_vld <= 1'b1;          // registered
+pc       <= pc + 1'b1;     // registered
+...
+assign desc = ring[pc];    // combinational -- reads the NEW pc
+```
+
+Both non-blocking assignments land on the same edge, so on the cycle `desc_vld`
+goes high `pc` has already advanced. Measured by `tb_seq.cpp`:
+
+| valid cycle | emitted | should have emitted |
+|---|---|---|
+| 0 | `ring[1]` | `ring[0]` |
+| 1 | `ring[2]` | `ring[1]` |
+| … | | |
+| 7 (`done`) | `ring[8]` — **past the end** | `ring[7]` |
+
+Three distinct failures out of one line. Descriptor 0 is never issued. Every
+descriptor runs one slot ahead of the valid that announces it. And the last
+cycle reads `ring[len]`, emitting whatever firmware happened to leave in the
+next ring slot — the bench poisons that slot with `0xDEADBEEF…` and catches it
+directly.
+
+**Nothing downstream can detect this.** Every descriptor is well-formed. The
+fetch it issues is a correct fetch of the wrong tensor, in a chip whose whole
+premise is that one static schedule replays per token. It is the same failure
+class the streamer bench pinned a contract for one block over: right data,
+wrong cycle.
+
+The fix registers `desc` alongside `desc_vld`, reading `ring[pc]` before the
+increment. Same cycle count, same latency, no extra state beyond the descriptor
+register itself. `tb_seq.cpp` also caught that `pc == len - 1` with `len == 0`
+wraps to `DEPTH-1` and replays all 256 ring slots; a zero-length program is now
+an ignored start.
+
+64 checks, 0 failures. P2-3 is 9 of 9 units.
+
+## Finding 23: the router's sigmoid table spanned the wrong range too
+
+Finding 20 established, on the FFN's SiLU, that the **input range** of a PWL
+table is the lever and the segment count is not. That lesson was never applied
+to the router's sigmoid, which had been sized on the segment axis alone: 16
+segments give 0.971 routing agreement, 32 give 0.990, 64 give 0.996, so 64 it
+was — 4,096 flip-flops of firmware-writable table behind a 64-way 32-bit mux,
+and the structure P4 could not get through ABC in either of two attempts (2 h
+and ~11 h of CPU).
+
+`make p2-pwl-sweep` now sweeps both axes against the same 512 real hidden
+states. Top-4 set agreement, gate ≥ 0.995:
+
+| range \ segs | 8 | 16 | 32 | 64 |
+|---|---:|---:|---:|---:|
+| ±8 | 0.9102 | 0.9707 | 0.9902 | **0.9961** |
+| **±4** | 0.9707 | 0.9902 | **0.9961** | 0.9961 |
+| ±2 | 0.9590 | 0.9844 | 0.9902 | 0.9941 |
+
+**Halving the range is worth exactly one doubling of the segment count** — the
+±4 row is the ±8 row shifted one column left. So 32 segments over ±4 buys the
+same 0.9961 as 64 over ±8, with half the table flops and half the read mux, and
+`make p2-router` reproduces top-1 1.0000 / top-4 0.9961 / exact 0.9902 bit for
+bit at the new recipe. That is the default now.
+
+±2 is where it stops paying. The logits genuinely reach past 2, so a ±2 table
+clips rather than resolving, and every column gets worse. **Range is a lever
+down to the actual dynamic range and no further** — which is why this has to be
+measured on real activations and cannot be reasoned about from the curve.
+
+Two things this makes concrete. First, the same mistake was made twice in this
+chip, on two different tables, and both times the symptom was "we need more
+segments". Second, the cost was not abstract: it is the difference between a
+synthesis run that converges and two that did not.
+
+## Finding 24: Pipelined tree reductions across `sonic_tile`, `sonic_router`, and `sonic_conv`
+
+Three blocks previously suffered from serial accumulators in combinational cones:
+- **`sonic_tile`**: 64 dependent 32-bit ripple adders per lane, missing from synthesis.
+  Rewritten as an elaboration-checked 3-stage hierarchical adder tree (S1 fold at
+  `ACC_LOCAL=16`, S2 fold-sum at `ACC_MID=24`, S3 `ACC_OUT=32` bank accumulate).
+  Measured at `TILE=8`: **depth 79 levels, 79,339 cells, 2,568 DFFs**.
+- **`sonic_conv`**: Tap sum chain converted to balanced reduction tree.
+  Measured: **depth 102 → 92 levels, cells 43,291 → 42,816**.
+- **`sonic_router`**: S1 MAC converted to balanced operand-width tree.
+  Measured: **depth down to 114 levels, cells 67,467**.
+
+All three rewrites are **100% numerically transparent** (`make golden`, `make test`,
+`make p2-router` (top-4 0.9961), `make p3-dense` (0.99363), `make p3-layer` (0.99119),
+and `make p3-top` (0.99119)).
+
 ## Caveats
 
 - Depth and cell counts come from `abc -g cmos2` against a **generic** library
@@ -389,8 +482,10 @@ represent 1.0 at all. One of the two is wrong.
 - `loop.py --sweep NAME=0,1` passes `-DNAME=0` and `-DNAME=1`, both of which
   *define* the macro. Boolean defines must be compared against a separate
   undefined baseline run.
-- `sonic_conv.sv`, `sonic_streamer.sv` and `sonic_seq.sv` still have no bench.
-  Findings 16-18 are what "synthesizes" is worth without one.
+- Every unit now has a bench. `sonic_conv`, `sonic_softmax` and `sonic_seq` each
+  shipped a real bug that survived synthesis, lint and code review, and
+  `sonic_router` shipped a critical path P&R could not close; findings 16-23 are
+  what "synthesizes" is worth without a bench.
 
 ## macOS toolchain note
 

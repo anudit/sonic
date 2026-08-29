@@ -13,7 +13,13 @@
 `include "sonic_defs.svh"
 
 module sonic_pe #(
-  parameter int ACC_BANKS = `ACC_BANKS
+  parameter int ACC_BANKS = `ACC_BANKS,
+  parameter int W_BITS    = `W_BITS,
+  parameter int A_BITS    = `A_BITS,
+  parameter int ACC_LOCAL = `ACC_LOCAL,
+  parameter int ACC_FOLD  = `ACC_FOLD,
+  parameter int ACC_MID   = `ACC_MID,
+  parameter int ACC_OUT   = `ACC_OUT
 ) (
   input  logic                        clk,
   input  logic                        rst_n,
@@ -21,19 +27,19 @@ module sonic_pe #(
   input  logic                        clr,
   input  logic                        en,
   input  logic [$clog2(ACC_BANKS)-1:0] bank,
-  input  logic signed [`W_BITS-1:0]    w_in,
+  input  logic signed [W_BITS-1:0]    w_in,
   input  logic                        w_load,   // latch weight (prefill)
-  input  logic signed [`A_BITS-1:0]    a_in,
-  output logic signed [`W_BITS-1:0]    w_out,    // systolic pass-through
-  output logic signed [`A_BITS-1:0]    a_out,
-  output logic signed [`ACC_OUT-1:0]   acc,
+  input  logic signed [A_BITS-1:0]    a_in,
+  output logic signed [W_BITS-1:0]    w_out,    // systolic pass-through
+  output logic signed [A_BITS-1:0]    a_out,
+  output logic signed [ACC_OUT-1:0]   acc,
   output logic                        ovf
 );
 
-  logic signed [`W_BITS-1:0] w_held;
-  logic signed [`W_BITS-1:0] w_eff;
+  logic signed [W_BITS-1:0] w_held;
+  logic signed [W_BITS-1:0] w_eff;
   logic [ACC_BANKS-1:0]     bank_ovf;
-  logic signed [`ACC_OUT-1:0] bank_acc [ACC_BANKS];
+  logic signed [ACC_OUT-1:0] bank_acc [ACC_BANKS];
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n)      w_held <= '0;
@@ -45,7 +51,14 @@ module sonic_pe #(
   genvar b;
   generate
     for (b = 0; b < ACC_BANKS; b++) begin : g_bank
-      sonic_acc u_acc (
+      sonic_acc #(
+        .W_BITS(W_BITS),
+        .A_BITS(A_BITS),
+        .ACC_LOCAL(ACC_LOCAL),
+        .ACC_FOLD(ACC_FOLD),
+        .ACC_MID(ACC_MID),
+        .ACC_OUT(ACC_OUT)
+      ) u_acc (
         .clk(clk), .rst_n(rst_n),
         .clr  (clr && (bank == b[$clog2(ACC_BANKS)-1:0])),
         .en   (en  && (bank == b[$clog2(ACC_BANKS)-1:0])),

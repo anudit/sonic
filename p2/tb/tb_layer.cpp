@@ -29,6 +29,8 @@ static vluint64_t main_time = 0;
 double sc_time_stamp() { return main_time; }
 
 static const int T = 64, GROUP = 64;
+// sonic_tile: S1 fold trees -> S2 fold-to-mid -> S3 bank accumulate.
+static const int TILE_LATENCY = 3;
 
 static void tick() {
     dut->clk = 0; dut->eval(); main_time++;
@@ -78,10 +80,15 @@ static void tile_gemm(const int8_t *W, int ldw, const float *S, int lds,
         }
         dut->w_load = 0; tick();
 
+        // sonic_tile's reduction is a 3-deep pipeline (fold trees -> mid ->
+        // bank), and clr rides it alongside the data, so both need draining
+        // before acc_col is the result of this group rather than the last one.
         dut->clr = 1; dut->in_vld = 0; tick(); dut->clr = 0;   // one group per pass
+        for (int i = 1; i < TILE_LATENCY; i++) tick();
         for (int r = 0; r < T; r++) row[r] = (k0 + r < K) ? a[k0 + r] : 0;
         pack(dut->a_row, row, T, 8);
-        dut->in_vld = 1; tick(); dut->in_vld = 0; tick();
+        dut->in_vld = 1; tick(); dut->in_vld = 0;
+        for (int i = 1; i < TILE_LATENCY; i++) tick();
 
         int g = k0 / GROUP;
         for (int c = 0; c < T; c++)

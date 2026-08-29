@@ -1,0 +1,28 @@
+{
+  "model": "LiquidAI/LFM2.5-8B-A1B",
+  "layer": 0,
+  "tokens": 1,
+  "d": 2048,
+  "experts": 1,
+  "top_k": 1,
+  "inter": 7168,
+  "unique_experts": [
+    0
+  ],
+  "act_scale": 0.003985744292341818,
+  "bin": "layer_l0_dense.bin",
+  "size_mb": 46.8,
+  "layout": [
+    "n d E K I U (i32)",
+    "act_scale f32",
+    "h_q[n,d] i8",
+    "x[n,d] f32",
+    "y_ref[n,d] f32",
+    "Wr[E,d] f32",
+    "bias[E] f32",
+    "sel[n,K] i32",
+    "rwt[n,K] f32",
+    "uniq[U] i32",
+    "per expert: gu_q[2I,d] i8, gu_s[2I,d/64] f32, dn_q[d,I] i8, dn_s[d,I/64] f32"
+  ]
+}

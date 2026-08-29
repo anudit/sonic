@@ -14,28 +14,35 @@
 // not optional for tapeout).
 `include "sonic_defs.svh"
 
-module sonic_acc (
+module sonic_acc #(
+  parameter int W_BITS    = `W_BITS,
+  parameter int A_BITS    = `A_BITS,
+  parameter int ACC_LOCAL = `ACC_LOCAL,
+  parameter int ACC_FOLD  = `ACC_FOLD,
+  parameter int ACC_MID   = `ACC_MID,
+  parameter int ACC_OUT   = `ACC_OUT
+) (
   input  logic                      clk,
   input  logic                      rst_n,
   input  logic                      clr,      // start a new dot product
   input  logic                      en,       // this cycle carries a product
-  input  logic signed [`W_BITS-1:0]  w,
-  input  logic signed [`A_BITS-1:0]  a,
+  input  logic signed [W_BITS-1:0]  w,
+  input  logic signed [A_BITS-1:0]  a,
   input  logic                      flush,    // force fold + epilogue
-  output logic signed [`ACC_OUT-1:0] acc,
+  output logic signed [ACC_OUT-1:0] acc,
   output logic                      ovf
 );
 
-  localparam int PROD_BITS = `W_BITS + `A_BITS;
+  localparam int PROD_BITS = W_BITS + A_BITS;
 
   logic signed [PROD_BITS-1:0]  prod;
-  logic signed [`ACC_LOCAL-1:0]  local_q, local_n;
-  logic signed [`ACC_MID-1:0]    mid_q, mid_n;
-  logic [$clog2(`ACC_FOLD):0]    cnt_q, cnt_n;
+  logic signed [ACC_LOCAL-1:0]  local_q, local_n;
+  logic signed [ACC_MID-1:0]    mid_q, mid_n;
+  logic [$clog2(ACC_FOLD):0]    cnt_q, cnt_n;
   logic                         ovf_q, ovf_n;
 
   // Wide shadow sums, simulation-only, to detect truncation in either stage.
-  logic signed [`ACC_OUT-1:0]    local_wide, mid_wide;
+  logic signed [ACC_OUT-1:0]    local_wide, mid_wide;
 
   assign prod = w * a;
 
@@ -44,28 +51,28 @@ module sonic_acc (
     mid_n      = mid_q;
     cnt_n      = cnt_q;
     ovf_n      = ovf_q;
-    local_wide = `ACC_OUT'(local_q) + `ACC_OUT'(prod);
-    mid_wide   = `ACC_OUT'(mid_q);
+    local_wide = (ACC_OUT)'(local_q) + (ACC_OUT)'(prod);
+    mid_wide   = (ACC_OUT)'(mid_q);
 
     if (clr) begin
       local_n = '0; mid_n = '0; cnt_n = '0; ovf_n = 1'b0;
     end else if (en) begin
       // Local stage
 `ifndef SONIC_NO_OVF_CHECK
-      if (local_wide > (2**(`ACC_LOCAL-1) - 1) ||
-          local_wide < -(2**(`ACC_LOCAL-1))) ovf_n = 1'b1;
+      if (local_wide > (2**(ACC_LOCAL-1) - 1) ||
+          local_wide < -(2**(ACC_LOCAL-1))) ovf_n = 1'b1;
 `endif
-      local_n = `ACC_LOCAL'(local_wide);
+      local_n = (ACC_LOCAL)'(local_wide);
       cnt_n   = cnt_q + 1'b1;
 
       // Fold
-      if (cnt_n == $bits(cnt_q)'(`ACC_FOLD)) begin
-        mid_wide = `ACC_OUT'(mid_q) + local_wide;
+      if (cnt_n == $bits(cnt_q)'(ACC_FOLD)) begin
+        mid_wide = (ACC_OUT)'(mid_q) + local_wide;
 `ifndef SONIC_NO_OVF_CHECK
-        if (mid_wide > (2**(`ACC_MID-1) - 1) ||
-            mid_wide < -(2**(`ACC_MID-1))) ovf_n = 1'b1;
+        if (mid_wide > (2**(ACC_MID-1) - 1) ||
+            mid_wide < -(2**(ACC_MID-1))) ovf_n = 1'b1;
 `endif
-        mid_n   = `ACC_MID'(mid_wide);
+        mid_n   = (ACC_MID)'(mid_wide);
         local_n = '0;
         cnt_n   = '0;
       end
@@ -73,9 +80,7 @@ module sonic_acc (
   end
 
   // Epilogue: mid + whatever is still sitting in the partial local stage.
-  // Dropping the partial is the classic ragged-reduction bug -- any K that is
-  // not a multiple of ACC_FOLD loses its tail. tb/test_acc.py sweeps every K.
-  assign acc = `ACC_OUT'(mid_q) + `ACC_OUT'(local_q);
+  assign acc = (ACC_OUT)'(mid_q) + (ACC_OUT)'(local_q);
   assign ovf = ovf_q;
 
   always_ff @(posedge clk or negedge rst_n) begin

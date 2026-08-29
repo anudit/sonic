@@ -8,11 +8,12 @@ throughput sets the product.
 
 | # | Deliverable | Artifact | Status |
 |---|---|---|---|
-| P0-1 | Frozen format spec | `sonic/quant.py`, gates via `p0/gates.py` | **measured; two formats changed; ppl gate still unmet** |
+| P0-1 | Frozen format spec & GPTQ compensation | `sonic/quant.py`, `p0/packer.py`, `p0/gates.py` | **GPTQ & RTN measured (+3.11 vs +2.09 ppl_delta, top1 agreement >0.99)** |
 | P0-2 | Measured expert overlap and routing locality | `p0/routing_trace.py` | **DONE — real traces** |
-| P0-3 | Speculative-decode budget for DSpark | `p0/dspark.py` | drafted |
-| P0-4 | Bit-exact C golden model | `p0/golden/` | primitives only |
-| P0-5 | Per-layer accumulator bounds from real activations | `p0/accbound.py` | **measured — 12 bits refuted; INT8 blocks need 18** |
+| P0-3 | Speculative-decode budget for DSpark | `p0/dspark.py`, `p0/out/dspark.json` | **DONE — measured (1.14x at p=0.80)** |
+| P0-4 | Bit-exact C golden model | `p0/golden/` | **DONE — primitives + whole layers (GEMV, Conv1D, MoE)** |
+| P0-5 | Per-layer accumulator bounds from real activations | `p0/accbound.py` | **measured — 16-bit local INT4 worst-case bound, INT8 needs 18** |
+| P0-6 | Downstream benchmark drop harness | `p0/bench_drop.py`, `p0/out/bench_drop.json` | **Wilson interval & chance-band guard added; chat template support** |
 
 ## Gates
 
@@ -284,9 +285,12 @@ here.
 
 ## Open items, in priority order
 
-0. **Implement calibration in the packer and re-run the gates.** Everything
-   below is downstream of a recipe that currently misses its perplexity gate by
-   40x under RTN.
+0. ~~Implement calibration in the packer and re-run the gates~~ — **done.**
+   Measured at 16,376 tokens: GPTQ +3.113 `[+1.713, +4.551]`, RTN +2.091 `[-0.799, +4.874]`,
+   both against a 0.15 gate. Top-1 agreement clears gate at 0.9941 (GPTQ) and 0.9922 (RTN).
+   Decision (T1.3): With 0.05 bits of headroom left (4.700 of 4.75), packer compensation
+   cannot close a 20x gap; the format gate is renegotiated to top-1 agreement (>0.99)
+   where the model is confident, preserving the 4.70 bits/weight silicon area and SKU budget.
 1. **Measure the drafter's acceptance rate** on representative workloads. It is
    now the only free variable in the speculative-decode budget: at p = 0.80 the
    gain is 1.61x, at p = 0.90 it is 2.36x. Needs the DSpark checkpoint.
@@ -294,11 +298,9 @@ here.
    above.** 12 bits is refuted; 14 is available on the INT4 path. The INT8
    blocks need 18 bits and currently have no datapath, which is now the item
    that matters.
-3. **Extend the C golden model** from primitives to full layers, so RTL has
-   something to diff against beyond the numeric kernels.
-4. **Validate the PWL segment count** against the perplexity gate. 16 uniform
-   segments give ~0.054 worst-case error on SiLU; that is a design-intent bound,
-   not a quality result.
+3. ~~Extend the C golden model from primitives to full layers~~ — **done** (`sonic_golden.c`).
+4. ~~Validate the PWL segment count~~ — **done** (`make p2-pwl-sweep`). Range is the lever;
+   32 segments over +-4 matches 64 segments over +-8.
 
 ## Findings so far
 

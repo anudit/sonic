@@ -102,6 +102,10 @@ def route_counts(model, chunk: int, imbalance: float = 0.0,
         prior = rng.lognormal(-sigma ** 2 / 2, sigma, E)
         prior /= prior.sum()
 
+    if K == 1:
+        choices = rng.choice(E, size=chunk, p=prior)
+        return np.bincount(choices, minlength=E)
+
     counts = np.zeros(E, dtype=np.int64)
     for _ in range(chunk):
         counts[rng.choice(E, size=K, replace=False, p=prior)] += 1

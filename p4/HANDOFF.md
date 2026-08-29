@@ -134,6 +134,24 @@ runs/local/*/                             per-step logs and reports
 `metrics.json` is the actual deliverable of P4 — the GDS is what you look at,
 the metrics are what you learn from. Copy both back.
 
+## Outcome
+
+**Done.** The run finished 2026-08-28 20:08:48 UTC in 4 h 40 min, 80/80 stages,
+DRC/LVS/antenna clean. Results, metrics, the render and the honest caveats are
+in [RESULTS.md](RESULTS.md); the artifacts are in
+`p4/openlane/router/results/segs8/`.
+
+Three things this document got wrong, worth correcting for the next block:
+
+- **`LANES` is not the tractability knob; `ROUTER_PWL_SEGS` is.** The guess in
+  "Knobs" below was right that `LANES` does not shrink the hard part, and right
+  that `SEGS` is what touches it — but it named the segment-select mux while the
+  real weight is the 4,096 flip-flops of table behind it.
+- **The 10 ns clock could not be met by 100x**, not by a little. Post-CTS repair
+  reported WNS -1086.6 ns. It needed 1500 ns to let the flow proceed.
+- **The apt KLayout (0.26.2) cannot run `render_gds.py`** — it hands `.py` to
+  its Ruby interpreter and segfaults. Use 0.30 or newer.
+
 ## State as of handoff
 
 - Two GitHub runs cancelled mid-synthesis; no GDS was ever produced.

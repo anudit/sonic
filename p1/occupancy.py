@@ -30,13 +30,19 @@ def main() -> int:
     ap.add_argument("--tiles", type=int, nargs="+", default=[64, 96, 128, 181])
     ap.add_argument("--chunks", type=int, nargs="+", default=[512, 1024, 2048, 4096])
     ap.add_argument("--trials", type=int, default=16)
+    ap.add_argument("--experts", type=int, default=None, help="override num experts (e.g. 8 for P1-7)")
+    ap.add_argument("--top-k", type=int, default=None, help="override top-k (e.g. 1 for P1-7)")
     a = ap.parse_args()
 
     m = load(a.model)
     if not m.is_moe:
         print("dense model -- occupancy is 1.0 by construction"); return 0
 
-    print(f"{m.name}: {m.n_experts} experts top-{m.top_k}, gate >= {GATE:.2f}")
+    import dataclasses
+    n_experts = a.experts or m.n_experts
+    top_k = a.top_k or m.top_k
+    m = dataclasses.replace(m, n_experts=n_experts, top_k=top_k)
+    print(f"{m.name}: {n_experts} experts top-{top_k}, gate >= {GATE:.2f}")
     print("mean occupancy over", a.trials, "trials; ! marks a gate failure\n")
 
     for cv in (0.0, 0.3, 0.5, 0.8):
@@ -50,7 +56,7 @@ def main() -> int:
                         for s in range(a.trials)]
                 mu = float(np.mean(vals))
                 cells.append(f"{mu:>9.3f}{'!' if mu < GATE else ' '}")
-            print(f"    {chunk:>7}{''.join(cells)}   {chunk * m.top_k // m.n_experts:>6}")
+            print(f"    {chunk:>7}{''.join(cells)}   {chunk * top_k // n_experts:>6}")
         print()
 
     print("Reading: occupancy is set by tokens-per-expert relative to the tile edge.")

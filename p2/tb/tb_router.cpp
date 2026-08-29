@@ -98,7 +98,8 @@ static float quantize(const std::vector<float> &x, std::vector<T> &out, int bits
 }
 
 static void load_sigmoid_table() {
-  // 16 segments of width 1 over [-8, 8), Q16 -- the firmware-loadable table.
+  // SEGS segments of width 2*RANGE/SEGS over [-RANGE, RANGE), Q16 -- the
+  // firmware-loadable table.
   //
   // Slope from the endpoints, but the intercept is MINIMAX-CENTRED rather than
   // taken from the chord. A chord through a segment of a convex region sits
@@ -109,10 +110,14 @@ static void load_sigmoid_table() {
 #ifndef SEGS_OVERRIDE
 #define SEGS_OVERRIDE 16
 #endif
-  const int SEGS = SEGS_OVERRIDE;   // must match ROUTER_PWL_SEGS in the RTL
-  const double W = 16.0 / SEGS;
+#ifndef RANGE_OVERRIDE
+#define RANGE_OVERRIDE 8
+#endif
+  const int SEGS = SEGS_OVERRIDE;    // must match ROUTER_PWL_SEGS in the RTL
+  const double R = RANGE_OVERRIDE;   // must match ROUTER_PWL_RANGE
+  const double W = 2.0 * R / SEGS;
   for (int s = 0; s < SEGS; s++) {
-    double x0 = -8.0 + s * W, x1 = x0 + W;
+    double x0 = -R + s * W, x1 = x0 + W;
     double y0 = 1.0 / (1.0 + std::exp(-x0)), y1 = 1.0 / (1.0 + std::exp(-x1));
     double m = (y1 - y0) / W;
     double lo = 1e30, hi = -1e30;
@@ -130,7 +135,8 @@ static void load_sigmoid_table() {
   }
   dut->tbl_we = 0;
   tick();
-  printf("  PWL sigmoid: %d segments of width %.4f\n", SEGS, W);
+  printf("  PWL sigmoid: %d segments of width %.4f over [%+.1f, %+.1f)\n",
+         SEGS, W, -R, R);
 }
 
 int main(int argc, char **argv) {
@@ -184,7 +190,19 @@ int main(int argc, char **argv) {
         tick();
       }
     dut->in_vld = 0;
-    tick();
+
+    // Wait for `done` rather than assuming the answer is ready one tick after
+    // the last beat. The router is pipelined -- MAC, epilogue scale, segment
+    // select, PWL, then two cycles per top-k pass -- so sel[] lands about a
+    // dozen cycles behind the final input beat. `done` is the contract; a fixed
+    // tick count would silently read a stale sel[] the moment the depth of any
+    // stage changes.
+    int guard = 0;
+    while (!dut->done && guard < 256) { tick(); guard++; }
+    if (!dut->done) {
+      printf("  token %d: done never asserted after %d cycles -- FAILED\n", t, guard);
+      return 1;
+    }
 
     if (t == 0) {
       // Reference: float logits -> sigmoid -> +bias, computed here so a

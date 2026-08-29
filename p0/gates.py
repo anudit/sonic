@@ -196,8 +196,18 @@ def quantize_(model, table: dict[str, quant.Fmt], verbose: bool = True,
                 p.copy_(apply_fmt(p.data, f))
             else:
                 from p0 import packer
-                p.copy_(packer.pack(p.data, f, mode,
-                                    (acts or {}).get(pname)))
+                packed = packer.pack(p.data, f, mode, (acts or {}).get(pname))
+                # A single non-finite weight anywhere takes the whole model's
+                # perplexity to NaN, and NaN is indistinguishable from "the
+                # format is bad" in the report. Fail loudly at the tensor that
+                # caused it instead.
+                if not torch.isfinite(packed).all():
+                    raise SystemExit(
+                        f"packer={mode} produced "
+                        f"{int((~torch.isfinite(packed)).sum())} non-finite "
+                        f"values in {pname} {tuple(p.shape)} ({block}, "
+                        f"{f.kind}). Refusing to report a NaN gate.")
+                p.copy_(packed)
             stats.setdefault(block, [0, 0.0])
             stats[block][0] += p.numel()
             stats[block][1] += p.numel() * f.bits
@@ -410,10 +420,10 @@ def main() -> int:
     ap.add_argument("--max-tokens", type=int, default=65536)
     ap.add_argument("--window", type=int, default=2048)
     ap.add_argument("--device", default="mps" if torch.backends.mps.is_available() else "cpu")
-    ap.add_argument("--pack", choices=["rtn", "clip", "awq"], default="rtn",
+    ap.add_argument("--pack", choices=["rtn", "clip", "awq", "gptq"], default="rtn",
                     help="packer strategy. rtn is naive round-to-nearest; clip searches the\n"
-                         "clipping ratio; awq adds activation-aware scaling. All three\n"
-                         "emit the SAME format -- only the scales and rounding differ")
+                         "clipping ratio; awq adds activation-aware scaling; gptq adds\n"
+                         "inverse-Hessian error compensation. All four emit the SAME format")
     ap.add_argument("--calib-windows", type=int, default=4)
     ap.add_argument("--emb-fmt", choices=["g64", "g32", "outlier", "int8g"],
                     help="override the tied embedding / LM head format. The ablation "
@@ -466,19 +476,22 @@ def main() -> int:
     b_nll, b_top, b_conf = evaluate(model, ids, a.window, a.device, "bf16")
     base_ppl = float(np.exp(b_nll.mean()))
 
-    acts = None
-    if a.pack == "awq":
+    acts, hstore = None, None
+    if a.pack in ("awq", "gptq"):
         from p0 import packer
-        print("\n--- calibrating (activation magnitudes, BF16 model) ---")
+        print(f"\n--- calibrating ({a.pack.upper()}, BF16 model) ---")
         t1 = time.time()
+        hstore = packer.HessianStore()
         acts = packer.collect_act_scales(model, ids, a.window, a.device,
-                                         a.calib_windows)
+                                         a.calib_windows, store=hstore)
         # lm_head is tied to embed_tokens, and the parameter we quantize is the
         # embedding one; carry its activation across or the LM head silently
         # falls back to clip search.
         if "lm_head.weight" in acts:
             acts.setdefault("model.embed_tokens.weight", acts["lm_head.weight"])
-        print(f"  captured {len(acts)} activation vectors in {time.time()-t1:.1f}s")
+        spilled = sum(f.stat().st_size for f in hstore.root.glob("*.f32"))
+        print(f"  captured {len(acts)} activation statistics in {time.time()-t1:.1f}s "
+              f"({spilled/2**30:.1f} GB of Hessians under {hstore.root})")
 
     table = dict(quant.UNIFORM_INT4 if a.uniform else quant.BLOCK_FMT)
     label = "UNIFORM INT4 (ablation)" if a.uniform else "the recipe"
@@ -509,7 +522,11 @@ def main() -> int:
         table = {k: (v if k in keep else quant.BF16) for k, v in table.items()}
         label = f"ONLY {sorted(keep)}"
     print(f"\n--- applying {label} via packer={a.pack} ---")
-    cov = quantize_(model, table, mode=a.pack, acts=acts)
+    try:
+        cov = quantize_(model, table, mode=a.pack, acts=acts)
+    finally:
+        if hstore is not None:
+            hstore.close()          # ~21 GB of scratch; do not leave it behind
 
     print("\n--- quantized ---")
     q_nll, q_top, _ = evaluate(model, ids, a.window, a.device, "quant")

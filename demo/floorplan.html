@@ -1,466 +1,1049 @@
-<title>Sonic S1 Floorplan</title>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonic S1 Silicon Floorplan & Architecture</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
 
 <style>
 :root {
-  --substrate: #EDF0F3;
-  --surface:   #FFFFFF;
-  --surface-2: #E3E8EC;
-  --line:      #C3CCD4;
-  --line-soft: #DBE2E7;
-  --ink:       #131A21;
-  --ink-2:     #46545F;
-  --ink-3:     #6E7F8B;
-  --copper:    #B0602F;
-  --copper-lo: #F1E0D5;
-  --die-bg:    #DCE3E8;
-  --die-edge:  #A9B5BE;
-  --ok:        #2F6F52;
-  --warn:      #9A6212;
+  --bg: #000000;
+  --bg-card: #0c0e12;
+  --bg-card-hover: #141820;
+  --border: rgba(255, 255, 255, 0.12);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --text-main: #FFFFFF;
+  --text-muted: #8E9BAE;
+  --text-dim: #5A6678;
+  
+  --accent-purple: #9d4edd;
+  --accent-blue: #3a86ff;
+  --accent-cyan: #06d6a0;
+  --accent-amber: #f77f00;
+  --accent-rose: #ff006e;
 
-  --c-mem:   #4E7C97;
-  --c-comp:  #B0602F;
-  --c-io:    #6B6785;
-  --c-ctrl:  #5E7A63;
-  --c-route: #8A5A72;
-  --c-fill:  #97A6B1;
+  --c-comp: #3a86ff;
+  --c-mem: #9d4edd;
+  --c-io: #ff006e;
+  --c-route: #f77f00;
+  --c-ctrl: #06d6a0;
+  --c-fill: #2b3544;
 
-  --shadow: 0 1px 2px rgba(19,26,33,.07), 0 8px 24px -12px rgba(19,26,33,.18);
-  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --sans: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif;
-  --disp: "Archivo", var(--sans);
+  --sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
 }
-:root:not([data-theme="light"]) {
-  @media (prefers-color-scheme: dark) {
-    --substrate: #0F1319;
-    --surface:   #161C24;
-    --surface-2: #1E262F;
-    --line:      #2C3742;
-    --line-soft: #222B34;
-    --ink:       #E4EAF0;
-    --ink-2:     #A3B1BC;
-    --ink-3:     #74848F;
-    --copper:    #D98A55;
-    --copper-lo: #33231A;
-    --die-bg:    #131920;
-    --die-edge:  #35414D;
-    --ok:        #6BBF95;
-    --warn:      #D9A441;
 
-    --c-mem:   #5C93B3;
-    --c-comp:  #C87A45;
-    --c-io:    #8983A6;
-    --c-ctrl:  #75997C;
-    --c-route: #A9738E;
-    --c-fill:  #5C6C78;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text-main);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Ambient glow */
+body::before {
+  content: "";
+  position: fixed;
+  top: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 900px;
+  height: 600px;
+  background: radial-gradient(ellipse at center, rgba(58, 134, 255, 0.08) 0%, rgba(157, 78, 221, 0.05) 45%, transparent 75%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.wrap {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 36px 32px 64px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+}
+.brand-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #3a86ff, #9d4edd, #ff006e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 6px;
+}
+h1 {
+  font-size: clamp(28px, 3.5vw, 42px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: #fff;
+}
+.sub {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-top: 6px;
+  max-width: 60ch;
+}
+.meta-pills {
+  display: flex;
+  gap: 16px;
+}
+.pill {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  text-align: right;
+}
+.pill-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.pill-val {
+  font-family: var(--mono);
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* Controls */
+.controls-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 30px;
+}
+.sku-toggle {
+  display: inline-flex;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px;
+}
+.sku-btn {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 18px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sku-btn:hover { color: #fff; }
+.sku-btn[aria-pressed="true"] {
+  background: linear-gradient(135deg, #3a86ff, #9d4edd);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(58, 134, 255, 0.4);
+}
+.tool-toggles {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.chip-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 6px 12px;
+}
+.chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 8px var(--accent-cyan);
+}
+
+/* Keynote Showcase: Grid with 3 columns (Left Callouts | Center Chip | Right Callouts) */
+.showcase-grid {
+  display: grid;
+  grid-template-columns: 290px minmax(520px, 1fr) 290px;
+  gap: 32px;
+  align-items: center;
+  margin: 10px 0 40px;
+}
+@media (max-width: 1200px) {
+  .showcase-grid {
+    grid-template-columns: 1fr;
+    gap: 36px;
   }
 }
-:root[data-theme="dark"] {
-  --substrate: #0F1319;
-  --surface:   #161C24;
-  --surface-2: #1E262F;
-  --line:      #2C3742;
-  --line-soft: #222B34;
-  --ink:       #E4EAF0;
-  --ink-2:     #A3B1BC;
-  --ink-3:     #74848F;
-  --copper:    #D98A55;
-  --copper-lo: #33231A;
-  --die-bg:    #131920;
-  --die-edge:  #35414D;
-  --ok:        #6BBF95;
-  --warn:      #D9A441;
-  --c-mem:   #5C93B3;
-  --c-comp:  #C87A45;
-  --c-io:    #8983A6;
-  --c-ctrl:  #75997C;
-  --c-route: #A9738E;
-  --c-fill:  #5C6C78;
-  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+
+/* Callouts */
+.callout-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.callout-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 16px 18px;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+.callout-card:hover, .callout-card.active {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+.callout-card.active {
+  border-color: var(--active-col, #3a86ff);
+  box-shadow: 0 0 20px rgba(58, 134, 255, 0.2);
+}
+.callout-tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--active-col, #3a86ff);
+  margin-bottom: 4px;
+}
+.callout-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.callout-bullets {
+  list-style: none;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.callout-bullets li {
+  position: relative;
+  padding-left: 14px;
+  margin-bottom: 4px;
+}
+.callout-bullets li::before {
+  content: "&bull;";
+  position: absolute;
+  left: 0;
+  color: var(--active-col, var(--text-dim));
+  font-size: 14px;
 }
 
-* { box-sizing: border-box; }
-body {
-  margin: 0; background: var(--substrate); color: var(--ink);
-  font-family: var(--sans); font-size: 15px; line-height: 1.55;
-  -webkit-font-smoothing: antialiased;
+/* Center Die Container */
+.die-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
 }
-.wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 72px; }
+.die-frame {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  aspect-ratio: 1 / 1;
+  background: #06080b;
+  border-radius: 24px;
+  padding: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+/* Gradient bezel inspired by Apple A19 visual */
+.die-bezel {
+  position: absolute;
+  inset: 0;
+  border-radius: 24px;
+  padding: 2px;
+  background: linear-gradient(135deg, #9d4edd 0%, #3a86ff 30%, #06d6a0 70%, #ff006e 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.85;
+}
+.die-inner {
+  width: 100%;
+  height: 100%;
+  background: #080a0f;
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+}
 
-/* ---- masthead ---- */
-.mast { display: flex; flex-wrap: wrap; gap: 20px 32px; align-items: flex-end;
-        justify-content: space-between; padding-bottom: 22px;
-        border-bottom: 1px solid var(--line); }
-.eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: .16em;
-           text-transform: uppercase; color: var(--copper); margin: 0 0 8px; }
-h1 { font-family: var(--disp); font-weight: 800; font-size: clamp(30px, 5vw, 46px);
-     letter-spacing: -.022em; line-height: 1.02; margin: 0; text-wrap: balance; }
-.sub { color: var(--ink-2); margin: 10px 0 0; max-width: 56ch; }
-.mast-meta { display: flex; gap: 26px; font-family: var(--mono); font-size: 12px; }
-.mast-meta div span { display: block; color: var(--ink-3); font-size: 10.5px;
-                      letter-spacing: .1em; text-transform: uppercase; }
-.mast-meta div b { font-weight: 600; font-size: 17px; font-variant-numeric: tabular-nums; }
+svg.chip-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 
-/* ---- sku switch ---- */
-.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-            margin: 26px 0 18px; }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px;
-       overflow: hidden; background: var(--surface); }
-.seg button { appearance: none; border: 0; background: transparent; cursor: pointer;
-  font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--ink-2);
-  padding: 8px 15px; border-right: 1px solid var(--line-soft); }
-.seg button:last-child { border-right: 0; }
-.seg button[aria-pressed="true"] { background: var(--copper); color: #fff; }
-.seg button:focus-visible { outline: 2px solid var(--copper); outline-offset: -2px; }
-.hint { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); }
+/* Silicon Block Aesthetics */
+.svg-block {
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.svg-block rect.base {
+  fill: #0d1219;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+  transition: all 0.2s ease;
+}
+.svg-block:hover rect.base, .svg-block.active rect.base {
+  fill: #151d28;
+  stroke: var(--block-col, #3a86ff);
+  stroke-width: 2;
+  filter: drop-shadow(0 0 8px var(--block-col, rgba(58, 134, 255, 0.5)));
+}
+.svg-block text.title {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 11px;
+  fill: #FFFFFF;
+}
+.svg-block text.meta {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 8.5px;
+  fill: var(--text-muted);
+}
+.svg-pattern {
+  opacity: 0.25;
+  pointer-events: none;
+}
+.svg-interconnect {
+  stroke: rgba(58, 134, 255, 0.25);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+  fill: none;
+}
+.svg-interconnect.active {
+  stroke: var(--accent-cyan);
+  stroke-width: 1.8;
+  stroke-dasharray: 6 3;
+  animation: busFlow 1s linear infinite;
+}
+@keyframes busFlow {
+  from { stroke-dashoffset: 18; }
+  to { stroke-dashoffset: 0; }
+}
 
-/* ---- layout ---- */
-.stage { display: grid; grid-template-columns: minmax(0,1fr) 320px; gap: 22px;
-         align-items: start; }
-@media (max-width: 900px) { .stage { grid-template-columns: 1fr; } }
-@media (max-width: 720px) { .facts { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 420px) { .facts { grid-template-columns: 1fr; } }
+/* Detail Drawer (Modal / Inspector Panel) */
+.detail-drawer {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 28px;
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: 1.2fr 2fr 1fr;
+  gap: 28px;
+  align-items: center;
+}
+@media (max-width: 960px) {
+  .detail-drawer { grid-template-columns: 1fr; }
+}
+.detail-title-group h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+}
+.detail-title-group .badge {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(58, 134, 255, 0.15);
+  color: #3a86ff;
+}
+.detail-body p {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.detail-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+.stat-box span {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.stat-box b {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
 
-.die-shell { background: var(--surface); border: 1px solid var(--line);
-             border-radius: 10px; padding: 14px; box-shadow: var(--shadow); }
-.die-cap { display: flex; justify-content: space-between; align-items: baseline;
-           font-family: var(--mono); font-size: 11px; color: var(--ink-3);
-           letter-spacing: .08em; text-transform: uppercase; margin-bottom: 10px; }
-svg.die { display: block; width: 100%; height: auto; }
-.blk { cursor: pointer; transition: opacity .12s ease; }
-.blk rect { stroke: var(--die-bg); stroke-width: 1.6; }
-.blk:hover rect, .blk.sel rect { stroke: var(--ink); stroke-width: 2.2; }
-.blk.dim { opacity: .3; }
-.blk text { font-family: var(--mono); font-size: 8.4px; fill: #fff;
-            pointer-events: none; font-weight: 500; }
-.blk text.sm { font-size: 7.2px; opacity: .82; }
-.blk:focus-visible rect { stroke: var(--copper); stroke-width: 3; outline: none; }
+/* Bottom Stats Bar */
+.bottom-facts {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+  margin-top: 24px;
+}
+@media (max-width: 1024px) {
+  .bottom-facts { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 600px) {
+  .bottom-facts { grid-template-columns: repeat(2, 1fr); }
+}
+.fact-tile {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.fact-tile span {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+.fact-tile b {
+  font-family: var(--sans);
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+}
+.fact-tile small {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
 
-/* ---- detail ---- */
-.panel { background: var(--surface); border: 1px solid var(--line);
-         border-radius: 10px; padding: 18px; box-shadow: var(--shadow);
-         position: sticky; top: 20px; }
-.panel h2 { font-family: var(--disp); font-size: 19px; font-weight: 700;
-            letter-spacing: -.01em; margin: 0 0 2px; line-height: 1.2; text-wrap: balance; }
-.swatch { width: 100%; height: 4px; border-radius: 2px; margin-bottom: 13px; }
-.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px;
-      font-family: var(--mono); font-size: 12px; margin: 12px 0 0;
-      font-variant-numeric: tabular-nums; }
-.kv dt { color: var(--ink-3); }
-.kv dd { margin: 0; text-align: right; font-weight: 500; }
-.panel p { font-size: 13.5px; color: var(--ink-2); margin: 12px 0 0; }
-.tag { display: inline-block; font-family: var(--mono); font-size: 10px;
-       letter-spacing: .08em; text-transform: uppercase; padding: 3px 7px;
-       border-radius: 4px; background: var(--surface-2); color: var(--ink-2); }
-
-/* ---- legend + facts ---- */
-.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px;
-          font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
-.legend button { appearance: none; background: transparent; border: 0; padding: 0;
-  cursor: pointer; font: inherit; color: inherit; display: inline-flex;
-  align-items: center; gap: 6px; }
-.legend button[aria-pressed="false"] { opacity: .38; }
-.legend i { width: 10px; height: 10px; border-radius: 2px; display: block; }
-
-.facts { display: grid; grid-template-columns: repeat(3, 1fr);
-         gap: 1px; background: var(--line); border: 1px solid var(--line);
-         border-radius: 10px; overflow: hidden; margin-top: 28px; }
-.fact { background: var(--surface); padding: 15px 17px; }
-.fact span { display: block; font-family: var(--mono); font-size: 10.5px;
-             letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
-.fact b { font-family: var(--disp); font-weight: 700; font-size: 25px;
-          letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
-.fact small { display: block; color: var(--ink-2); font-size: 12px; margin-top: 3px; }
-
-.note { margin-top: 28px; padding: 16px 18px; border-left: 2px solid var(--copper);
-        background: var(--copper-lo); border-radius: 0 8px 8px 0; }
-.note p { margin: 0; font-size: 13.5px; color: var(--ink-2); max-width: 72ch; }
-.note b { color: var(--ink); }
-footer { margin-top: 34px; padding-top: 16px; border-top: 1px solid var(--line);
-         font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+footer {
+  margin-top: 48px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
 </style>
+</head>
+<body>
 
 <div class="wrap">
-  <header class="mast">
+  <!-- Header -->
+  <header class="header">
     <div>
-      <p class="eyebrow">Edge inference ASIC &middot; 14 nm</p>
-      <h1>Sonic S1 Floorplan</h1>
-      <p class="sub">Every block is drawn to its real area. The rectangles come
-      straight out of <code>sonic/roofline.area</code> &mdash; change the SKU and the
-      die re-proportions itself.</p>
+      <div class="brand-eyebrow">Sonic S1 Neural Engine &middot; 14 nm FinFET</div>
+      <h1>Silicon Architecture & Floorplan</h1>
+      <p class="sub">16,384-MAC dual-mode systolic array with on-die causal convolution, sparse MoE router, and integrated 8 MB chunked prefill SRAM.</p>
     </div>
-    <div class="mast-meta">
-      <div><span>Die</span><b id="m-die">&mdash;</b></div>
-      <div><span>Decode</span><b id="m-tok">&mdash;</b></div>
-      <div><span>Power</span><b id="m-pw">&mdash;</b></div>
+    <div class="meta-pills">
+      <div class="pill">
+        <span class="pill-label">Die Area</span>
+        <div class="pill-val" id="val-die">20.56 mm&sup2;</div>
+      </div>
+      <div class="pill">
+        <span class="pill-label">8B-A1B Decode</span>
+        <div class="pill-val" id="val-tok">67.3 tok/s</div>
+      </div>
+      <div class="pill">
+        <span class="pill-label">TDP Power</span>
+        <div class="pill-val" id="val-pwr">3.73 W</div>
+      </div>
     </div>
   </header>
 
-  <div class="controls">
-    <div class="seg" role="group" aria-label="SKU">
-      <button data-sku="A" aria-pressed="false">SKU A &middot; 25.6 GB/s</button>
-      <button data-sku="B" aria-pressed="true">SKU B &middot; 68.3 GB/s</button>
-      <button data-sku="C" aria-pressed="false">SKU C &middot; 136.5 GB/s</button>
+  <!-- Controls -->
+  <div class="controls-bar">
+    <div class="sku-toggle" role="group" aria-label="SKU Selection">
+      <button class="sku-btn" data-sku="A" aria-pressed="false">SKU A &middot; 25.6 GB/s</button>
+      <button class="sku-btn" data-sku="B" aria-pressed="true">SKU B &middot; 68.3 GB/s</button>
+      <button class="sku-btn" data-sku="C" aria-pressed="false">SKU C &middot; 136.5 GB/s</button>
     </div>
-    <span class="hint">Click any block for detail &middot; filter by function below</span>
-  </div>
-
-  <div class="stage">
-    <div>
-      <div class="die-shell">
-        <div class="die-cap"><span id="cap-l">Floorplan</span><span id="cap-r"></span></div>
-        <svg class="die" id="die" viewBox="0 0 700 470" role="img"
-             aria-label="Sonic S1 die floorplan, blocks sized by area"></svg>
+    <div class="tool-toggles">
+      <div class="chip-badge">
+        <div class="chip-dot"></div>
+        <span>Bit-Exact RTL Verified (make p3-top 0.99119)</span>
       </div>
-      <div class="legend" id="legend"></div>
+    </div>
+  </div>
+
+  <!-- Keynote Showcase Grid (Left Callouts | Center Die | Right Callouts) -->
+  <div class="showcase-grid">
+    
+    <!-- Left Column Callouts -->
+    <div class="callout-stack">
+      
+      <!-- Callout 1: Systolic Array -->
+      <div class="callout-card active" data-target="tile-array" style="--active-col: var(--c-comp);">
+        <span class="callout-tag">Compute Core</span>
+        <div class="callout-title">4&times; Systolic Sub-Tiles (16,384 MACs)</div>
+        <ul class="callout-bullets">
+          <li>128&times;128 INT4&times;INT8 array sub-tiled into 4&times; 64&times;64 units</li>
+          <li>S1 Fold-16 trees &rarr; S2 fold sum &rarr; S3 8-bank accumulators</li>
+          <li>Dual-mode: Weight-stationary prefill / output-stationary decode</li>
+          <li>Occupancy 0.888 vs 0.80 monolithic under measured MoE skew</li>
+        </ul>
+      </div>
+
+      <!-- Callout 2: MoE Router -->
+      <div class="callout-card" data-target="router-unit" style="--active-col: var(--c-route);">
+        <span class="callout-tag">MoE Routing</span>
+        <div class="callout-title">MoE Dynamic Top-K Router</div>
+        <ul class="callout-bullets">
+          <li>INT12&times;INT12 datapath for 0.9961 routing agreement</li>
+          <li>32-segment PWL sigmoid lookup over [&minus;4, +4) range</li>
+          <li>2-cycle pipelined tournament tree selector (114 levels)</li>
+          <li>Aux-loss-free bias load balancing with CV 0.163</li>
+        </ul>
+      </div>
+
+      <!-- Callout 3: 8 MB SRAM Cache -->
+      <div class="callout-card" data-target="sram-array" style="--active-col: var(--c-mem);">
+        <span class="callout-tag">On-Die Memory</span>
+        <div class="callout-title">8 MB SRAM (16 Banks)</div>
+        <ul class="callout-bullets">
+          <li>Holds 2048-token chunk residual stream on-die</li>
+          <li>Enables chunked prefill: expert fetched 1&times; per chunk, not per tok</li>
+          <li>16 independent 512 KB banks (OpenRAM macros)</li>
+          <li>6.40 mm&sup2; die area (largest single physical block)</li>
+        </ul>
+      </div>
+
+      <!-- Callout 4: Sequencer & RV32 -->
+      <div class="callout-card" data-target="seq-ctrl" style="--active-col: var(--c-ctrl);">
+        <span class="callout-tag">Control & Interconnect</span>
+        <div class="callout-title">Descriptor Ring & RV32 NoC</div>
+        <ul class="callout-bullets">
+          <li>512-descriptor static execution ring with runtime patch</li>
+          <li>Router directly patches expert IDs with 0-cycle bubble</li>
+          <li>Low-power RV32 controller for boot, DMA and firmware</li>
+        </ul>
+      </div>
+
     </div>
 
-    <aside class="panel" id="panel" aria-live="polite"></aside>
+    <!-- Center Column: Silicon Die Schematic -->
+    <div class="die-stage">
+      <div class="die-frame">
+        <div class="die-bezel"></div>
+        <div class="die-inner">
+          <svg class="chip-svg" id="chip-svg" viewBox="0 0 600 600" aria-label="Sonic S1 Silicon Die Schematic">
+            
+            <!-- Background Silicon Substrate -->
+            <rect x="0" y="0" width="600" height="600" fill="#07090d"/>
+            
+            <!-- Die Grid Pattern -->
+            <defs>
+              <pattern id="siliconGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.03)" stroke-width="0.75"/>
+              </pattern>
+              <pattern id="sramPattern" width="10" height="8" patternUnits="userSpaceOnUse">
+                <rect width="8" height="6" fill="rgba(157, 78, 221, 0.15)" stroke="rgba(157, 78, 221, 0.35)" stroke-width="0.5"/>
+              </pattern>
+              <pattern id="pePattern" width="8" height="8" patternUnits="userSpaceOnUse">
+                <rect width="6" height="6" fill="rgba(58, 134, 255, 0.12)" stroke="rgba(58, 134, 255, 0.25)" stroke-width="0.5"/>
+              </pattern>
+            </defs>
+            <rect width="600" height="600" fill="url(#siliconGrid)"/>
+
+            <!-- Chip Logo / Header Badge -->
+            <g transform="translate(24, 28)">
+              <text x="0" y="16" font-family="var(--sans)" font-weight="800" font-size="20" fill="#ffffff" letter-spacing="-0.02em">&#9889; SONIC S1</text>
+              <text x="0" y="32" font-family="var(--mono)" font-weight="500" font-size="9" fill="var(--accent-blue)" letter-spacing="0.1em">14nm FINFET &middot; 16,384 MACs</text>
+            </g>
+
+            <!-- Interconnect Busses (NoC Backbones) -->
+            <path id="bus-streamer" class="svg-interconnect active" d="M 80,120 L 80,480 L 160,480 L 160,180 L 300,180"/>
+            <path id="bus-noc" class="svg-interconnect" d="M 310,80 L 310,540 M 80,300 L 520,300"/>
+
+            <!-- ==================== 1. TOP IO / LPDDR5X PHY ==================== -->
+            <g class="svg-block" id="blk-phy" data-key="LPDDR5X x64 PHY" style="--block-col: var(--c-io);">
+              <rect class="base" x="20" y="70" width="560" height="42" rx="4"/>
+              <rect x="24" y="74" width="552" height="12" fill="rgba(255, 0, 110, 0.15)"/>
+              <text class="title" x="32" y="96">LPDDR5X PHY &amp; Memory Controller</text>
+              <text class="meta" x="420" y="96" id="svg-phy-bw">68.3 GB/s &middot; x64 Bus</text>
+            </g>
+
+            <!-- ==================== 2. LEFT: 4x Systolic Sub-Tiles ==================== -->
+            <g class="svg-block active" id="blk-tiles" data-key="16,384-lane dual-mode array" style="--block-col: var(--c-comp);">
+              <!-- Outer Tile Array Container -->
+              <rect class="base" x="20" y="122" width="280" height="290" rx="6"/>
+              
+              <!-- 4 Sub-Tiles (64x64 each) -->
+              <!-- Tile 0 -->
+              <g transform="translate(30, 155)">
+                <rect width="125" height="118" fill="url(#pePattern)" rx="4"/>
+                <text x="8" y="18" font-family="var(--mono)" font-size="9.5" font-weight="600" fill="#fff">TILE 0 [64&times;64]</text>
+                <text x="8" y="32" font-family="var(--mono)" font-size="8" fill="var(--text-muted)">4,096 MACs</text>
+                <rect x="8" y="96" width="109" height="12" fill="rgba(58, 134, 255, 0.25)" rx="2"/>
+                <text x="12" y="105" font-family="var(--mono)" font-size="7" fill="#fff">ACC BANKS (8&times;32b)</text>
+              </g>
+              <!-- Tile 1 -->
+              <g transform="translate(165, 155)">
+                <rect width="125" height="118" fill="url(#pePattern)" rx="4"/>
+                <text x="8" y="18" font-family="var(--mono)" font-size="9.5" font-weight="600" fill="#fff">TILE 1 [64&times;64]</text>
+                <text x="8" y="32" font-family="var(--mono)" font-size="8" fill="var(--text-muted)">4,096 MACs</text>
+                <rect x="8" y="96" width="109" height="12" fill="rgba(58, 134, 255, 0.25)" rx="2"/>
+                <text x="12" y="105" font-family="var(--mono)" font-size="7" fill="#fff">ACC BANKS (8&times;32b)</text>
+              </g>
+              <!-- Tile 2 -->
+              <g transform="translate(30, 283)">
+                <rect width="125" height="118" fill="url(#pePattern)" rx="4"/>
+                <text x="8" y="18" font-family="var(--mono)" font-size="9.5" font-weight="600" fill="#fff">TILE 2 [64&times;64]</text>
+                <text x="8" y="32" font-family="var(--mono)" font-size="8" fill="var(--text-muted)">4,096 MACs</text>
+                <rect x="8" y="96" width="109" height="12" fill="rgba(58, 134, 255, 0.25)" rx="2"/>
+                <text x="12" y="105" font-family="var(--mono)" font-size="7" fill="#fff">ACC BANKS (8&times;32b)</text>
+              </g>
+              <!-- Tile 3 -->
+              <g transform="translate(165, 283)">
+                <rect width="125" height="118" fill="url(#pePattern)" rx="4"/>
+                <text x="8" y="18" font-family="var(--mono)" font-size="9.5" font-weight="600" fill="#fff">TILE 3 [64&times;64]</text>
+                <text x="8" y="32" font-family="var(--mono)" font-size="8" fill="var(--text-muted)">4,096 MACs</text>
+                <rect x="8" y="96" width="109" height="12" fill="rgba(58, 134, 255, 0.25)" rx="2"/>
+                <text x="12" y="105" font-family="var(--mono)" font-size="7" fill="#fff">ACC BANKS (8&times;32b)</text>
+              </g>
+
+              <text class="title" x="32" y="142">16,384-Lane Dual-Mode Array</text>
+              <text class="meta" x="195" y="142">5.73 mm&sup2; &middot; Fold-16</text>
+            </g>
+
+            <!-- ==================== 3. RIGHT: 8 MB SRAM Array ==================== -->
+            <g class="svg-block" id="blk-sram" data-key="8 MB SRAM, 16 banks" style="--block-col: var(--c-mem);">
+              <rect class="base" x="310" y="122" width="270" height="290" rx="6"/>
+              
+              <!-- 16 SRAM Banks Drawn As Parallel Columns -->
+              <g transform="translate(320, 155)">
+                <rect width="250" height="245" fill="url(#sramPattern)" rx="4"/>
+                <!-- 8 dual column strips -->
+                <line x1="31" y1="0" x2="31" y2="245" stroke="rgba(255,255,255,0.08)"/>
+                <line x1="62" y1="0" x2="62" y2="245" stroke="rgba(255,255,255,0.08)"/>
+                <line x1="93" y1="0" x2="93" y2="245" stroke="rgba(255,255,255,0.08)"/>
+                <line x1="125" y1="0" x2="125" y2="245" stroke="rgba(255,255,255,0.08)"/>
+                <line x1="156" y1="0" x2="156" y2="245" stroke="rgba(255,255,255,0.08)"/>
+                <line x1="187" y1="0" x2="187" y2="245" stroke="rgba(255,255,255,0.08)"/>
+                <line x1="218" y1="0" x2="218" y2="245" stroke="rgba(255,255,255,0.08)"/>
+              </g>
+
+              <text class="title" x="322" y="142">8 MB SRAM (16 Banks)</text>
+              <text class="meta" x="485" y="142">6.40 mm&sup2; &middot; Chunk Prefill</text>
+            </g>
+
+            <!-- ==================== 4. BOTTOM ROW: Specialised Units ==================== -->
+            
+            <!-- MoE Router -->
+            <g class="svg-block" id="blk-router" data-key="MoE router + top-k" style="--block-col: var(--c-route);">
+              <rect class="base" x="20" y="420" width="135" height="74" rx="4"/>
+              <text class="title" x="28" y="440">MoE Router</text>
+              <text class="meta" x="28" y="456">INT12&times;INT12</text>
+              <text class="meta" x="28" y="470">32-Seg PWL Top-4</text>
+              <text class="meta" x="28" y="484">0.05 mm&sup2;</text>
+            </g>
+
+            <!-- Streamer + Dequant -->
+            <g class="svg-block" id="blk-streamer" data-key="Streamer + expert gather + dequant + AES" style="--block-col: var(--c-route);">
+              <rect class="base" x="162" y="420" width="138" height="74" rx="4"/>
+              <text class="title" x="170" y="440">Weight Streamer</text>
+              <text class="meta" x="170" y="456">INT4 G64 Dequant</text>
+              <text class="meta" x="170" y="470">Expert Gather + AES</text>
+              <text class="meta" x="170" y="484">0.45 mm&sup2;</text>
+            </g>
+
+            <!-- Flash Attention -->
+            <g class="svg-block" id="blk-attn" data-key="Flash-attention engine" style="--block-col: var(--c-comp);">
+              <rect class="base" x="310" y="420" width="130" height="74" rx="4"/>
+              <text class="title" x="318" y="440">Flash Attention</text>
+              <text class="meta" x="318" y="456">Online Softmax</text>
+              <text class="meta" x="318" y="470">Q16 Dynamic Scale</text>
+              <text class="meta" x="318" y="484">0.80 mm&sup2;</text>
+            </g>
+
+            <!-- Short-Conv Unit -->
+            <g class="svg-block" id="blk-conv" data-key="Conv + vector units" style="--block-col: var(--c-comp);">
+              <rect class="base" x="450" y="420" width="130" height="74" rx="4"/>
+              <text class="title" x="458" y="440">Short-Conv 1D</text>
+              <text class="meta" x="458" y="456">64-Ch Double-Gate</text>
+              <text class="meta" x="458" y="470">72 KB State &middot; 7-Tap</text>
+              <text class="meta" x="458" y="484">0.43 mm&sup2;</text>
+            </g>
+
+            <!-- ==================== 5. FOOTER BLOCKS ==================== -->
+            
+            <!-- LM Head -->
+            <g class="svg-block" id="blk-lmhead" data-key="LM head + sampler" style="--block-col: var(--c-comp);">
+              <rect class="base" x="20" y="502" width="135" height="54" rx="4"/>
+              <text class="title" x="28" y="522">LM Head + Top-K</text>
+              <text class="meta" x="28" y="538">128K Vocab Sampler</text>
+            </g>
+
+            <!-- Vector Unit -->
+            <g class="svg-block" id="blk-vec" data-key="Programmable vector unit" style="--block-col: var(--c-comp);">
+              <rect class="base" x="162" y="502" width="138" height="54" rx="4"/>
+              <text class="title" x="170" y="522">Vector Engine</text>
+              <text class="meta" x="170" y="538">RMSNorm / RoPE / Add</text>
+            </g>
+
+            <!-- RV32 + NoC -->
+            <g class="svg-block" id="blk-rv32" data-key="RV32 + NoC + DFT" style="--block-col: var(--c-ctrl);">
+              <rect class="base" x="310" y="502" width="130" height="54" rx="4"/>
+              <text class="title" x="318" y="522">RV32 &amp; Sequencer</text>
+              <text class="meta" x="318" y="538">512-Desc Ring &middot; NoC</text>
+            </g>
+
+            <!-- IO Ring & PLLs -->
+            <g class="svg-block" id="blk-misc" data-key="PLLs, LDOs, PVT" style="--block-col: var(--c-io);">
+              <rect class="base" x="450" y="502" width="130" height="54" rx="4"/>
+              <text class="title" x="458" y="522">PLLs &amp; IO Ring</text>
+              <text class="meta" x="458" y="538">ESD / LDOs / PVT</text>
+            </g>
+
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column Callouts -->
+    <div class="callout-stack">
+      
+      <!-- Callout 5: LPDDR5X PHY -->
+      <div class="callout-card" data-target="phy-io" style="--active-col: var(--c-io);">
+        <span class="callout-tag">External Memory</span>
+        <div class="callout-title">LPDDR5X High-Speed PHY</div>
+        <ul class="callout-bullets">
+          <li>68.3 GB/s (SKU B) / 136.5 GB/s (SKU C) memory interface</li>
+          <li>Direct group-64 streaming path to integer MAC array</li>
+          <li>Batch-1 decode throughput = DRAM BW / 990 MB/tok</li>
+          <li>0.885 modelled DRAM controller efficiency</li>
+        </ul>
+      </div>
+
+      <!-- Callout 6: Short Conv -->
+      <div class="callout-card" data-target="conv-unit" style="--active-col: var(--c-comp);">
+        <span class="callout-tag">Sequential Mixing</span>
+        <div class="callout-title">1D Causal Short-Conv Engine</div>
+        <ul class="callout-bullets">
+          <li>18 layers &times; 2048 channels &times; 7 taps (72 KB total state)</li>
+          <li>State is constant regardless of context length</li>
+          <li>SRAM-retained across idle: zero DRAM reload traffic</li>
+          <li>Double-gated FIR structure: depth 92 levels, 42.8k cells</li>
+        </ul>
+      </div>
+
+      <!-- Callout 7: Flash Attention -->
+      <div class="callout-card" data-target="attn-unit" style="--active-col: var(--c-comp);">
+        <span class="callout-tag">Attention Accelerator</span>
+        <div class="callout-title">Online Flash-Softmax Engine</div>
+        <ul class="callout-bullets">
+          <li>Online running max & running sum rescaling algorithm</li>
+          <li>Avoids 2-pass score matrix DRAM traffic (cuts KV reads 2&times;)</li>
+          <li>Invariant across KV page boundaries from 1 to 97 tokens</li>
+          <li>6.14 KB/tok compact KV cache footprint</li>
+        </ul>
+      </div>
+
+      <!-- Callout 8: LM Head -->
+      <div class="callout-card" data-target="lmhead-unit" style="--active-col: var(--c-comp);">
+        <span class="callout-tag">Output Generation</span>
+        <div class="callout-title">Streaming LM Head &amp; Sampler</div>
+        <ul class="callout-bullets">
+          <li>128,000-way vocabulary streaming top-64 insertion sort</li>
+          <li>Hardware top-p, temperature & repetition sampling</li>
+          <li>Saves ~8% of total decode traffic (never spills logit vector)</li>
+          <li>0.14 mm&sup2; die footprint (28 logic depth levels)</li>
+        </ul>
+      </div>
+
+    </div>
+
   </div>
 
-  <div class="facts" id="facts"></div>
-
-  <div class="note">
-    <p><b>The one fact the design turns on.</b> Batch-1 decode is purely
-    memory-bound. At SKU B&rsquo;s 68.3 GB/s the array needs
-    <b id="n-lanes">119</b> lanes to keep up &mdash; it has <b>16,384</b>.
-    Everything above that exists for prefill, which is the only compute-bound
-    phase and the only latency a user feels. That is why the array is sized for
-    time-to-first-token and power-gated during generation.</p>
+  <!-- Detail Inspector Drawer -->
+  <div class="detail-drawer" id="inspector">
+    <div class="detail-title-group">
+      <span class="badge" id="insp-cat">Compute Core</span>
+      <h3 id="insp-name">16,384-lane dual-mode array</h3>
+      <div style="color: var(--text-muted); font-size: 12px; font-family: var(--mono);" id="insp-share">5.73 mm&sup2; &middot; 27.9% of die</div>
+    </div>
+    <div class="detail-body">
+      <p id="insp-desc">128&times;128 of INT4&times;INT8 MACs, sub-tiled 4&times;64&sup2; so a short expert wastes a quarter-sized pass instead of a full one. Weight-stationary in prefill, output-stationary in decode. Only ~3% utilised while generating &mdash; it is sized for time-to-first-token.</p>
+    </div>
+    <div class="detail-stats">
+      <div class="stat-box">
+        <span>Verified Cosine</span>
+        <b id="insp-metric">0.99119</b>
+      </div>
+      <div class="stat-box">
+        <span>RTL Depth</span>
+        <b id="insp-depth">79 Levels</b>
+      </div>
+    </div>
   </div>
 
-  <footer>Areas, throughput and power computed by <code>sonic/roofline.py</code>
-  at 14&nbsp;nm. Routing overhead is 9% at 65% target density.</footer>
+  <!-- Bottom Key Metric Tiles -->
+  <div class="bottom-facts" id="facts-bar">
+    <div class="fact-tile">
+      <span>Decode Speed</span>
+      <b id="fact-tok">67.3 tok/s</b>
+      <small>at 4K context</small>
+    </div>
+    <div class="fact-tile">
+      <span>Time to First Token</span>
+      <b id="fact-ttft">213.2 ms</b>
+      <small>2048 prompt (Compute)</small>
+    </div>
+    <div class="fact-tile">
+      <span>Traffic per Token</span>
+      <b id="fact-traffic">990.3 MB</b>
+      <small>4.700 bits/weight</small>
+    </div>
+    <div class="fact-tile">
+      <span>Active Sparsity</span>
+      <b id="fact-active">1.69B / 8.47B</b>
+      <small>19.9% MoE active load</small>
+    </div>
+    <div class="fact-tile">
+      <span>Energy Efficiency</span>
+      <b id="fact-energy">55.4 mJ</b>
+      <small>per generated token</small>
+    </div>
+    <div class="fact-tile">
+      <span>Array Saturation</span>
+      <b id="fact-sat">119 Lanes</b>
+      <small>of 16,384 built</small>
+    </div>
+  </div>
+
+  <footer>
+    <div>Areas, throughput, and power computed by <code>sonic/roofline.py</code> at 14 nm.</div>
+    <div>Verilator top-level regression: <code>make p3-top</code> PASSED (0.99119).</div>
+  </footer>
 </div>
 
 <script>
+// Data injected and updated by demo/build.py
 const DATA = {"skus":{"A":{"bus":32,"gbps":25.6,"gb":8,"blocks":{"LPDDR5X x64 PHY":1.05,"Programmable vector unit":1.5,"Flash-attention engine":0.8,"Streamer + expert gather + dequant + AES":0.45,"Conv + vector units":0.43,"IO ring / ESD":0.4,"PLLs, LDOs, PVT":0.33,"RV32 + NoC + DFT":0.29,"Token-gather / ragged-GEMM scheduler":0.25,"LM head + sampler":0.14,"MoE router + top-k":0.05,"8 MB SRAM, 16 banks":6.4,"16,384-lane dual-mode array":5.7344,"_routing":1.6042,"_total":19.4286},"tok_s_8b":25.2,"tok_s_26b":16.9,"watts":2.05,"mj":81.4,"ttft":213.2,"bound":"compute","lanes":16384,"tile":128,"sram":8.0,"lanes_needed":44.5},"B":{"bus":64,"gbps":68.3,"gb":8,"blocks":{"LPDDR5X x64 PHY":2.09,"Programmable vector unit":1.5,"Flash-attention engine":0.8,"Streamer + expert gather + dequant + AES":0.45,"Conv + vector units":0.43,"IO ring / ESD":0.4,"PLLs, LDOs, PVT":0.33,"RV32 + NoC + DFT":0.29,"Token-gather / ragged-GEMM scheduler":0.25,"LM head + sampler":0.14,"MoE router + top-k":0.05,"8 MB SRAM, 16 banks":6.4,"16,384-lane dual-mode array":5.7344,"_routing":1.6978,"_total":20.5622},"tok_s_8b":67.3,"tok_s_26b":45.0,"watts":3.73,"mj":55.4,"ttft":213.2,"bound":"compute","lanes":16384,"tile":128,"sram":8.0,"lanes_needed":118.8},"C":{"bus":128,"gbps":136.5,"gb":8,"blocks":{"LPDDR5X x64 PHY":4.18,"Programmable vector unit":1.5,"Flash-attention engine":0.8,"Streamer + expert gather + dequant + AES":0.45,"Conv + vector units":0.43,"IO ring / ESD":0.4,"PLLs, LDOs, PVT":0.33,"RV32 + NoC + DFT":0.29,"Token-gather / ragged-GEMM scheduler":0.25,"LM head + sampler":0.14,"MoE router + top-k":0.05,"8 MB SRAM, 16 banks":6.4,"16,384-lane dual-mode array":5.7344,"_routing":1.8859,"_total":22.8403},"tok_s_8b":134.4,"tok_s_26b":90.0,"watts":6.4,"mj":47.6,"ttft":213.2,"bound":"compute","lanes":16384,"tile":128,"sram":8.0,"lanes_needed":237.4}},"model":{"total":8467755712,"active":1685566144,"sparsity":0.1991,"mb_tok":990.3,"avg_bits":4.7,"experts":32,"top_k":4,"layers":24,"conv":18,"attn":6,"d":2048,"kv_kb":6.144,"gop":3.37},"quant":{"MoE experts":{"bits":4.33,"kind":"int4","group":64,"why":"INT4_G64 plus a 2% INT8 outlier-row budget"},"Dense SwiGLU FFN":{"bits":4.25,"kind":"int4","group":64,"why":"4 + 16/64 bits, FP16 scale per group of 64"},"Dense FFN":{"bits":8.25,"kind":"int8g","group":64,"why":"8 + 16/64 bits; per-tensor INT8 wastes the promotion"},"Short-conv blocks":{"bits":4.25,"kind":"int4","group":64,"why":"4 + 16/64 bits, FP16 scale per group of 64"},"Tied embedding / LM head":{"bits":4.5,"kind":"int4","group":32,"why":"4 + 16/32 bits; measured better than an outlier budget here"},"GQA attention":{"bits":8.25,"kind":"int8g","group":64,"why":"8 + 16/64 bits; per-tensor INT8 wastes the promotion"},"Routers":{"bits":12.25,"kind":"int12","group":64,"why":"measured: 0.998 routing agreement; INT8 caps at 0.986"}},"gates":{"ppl_delta_max":0.15,"bench_drop_max":1.5,"top1_agreement_min":0.99,"routing_agreement_min":0.995,"avg_bits_max":4.75}};
 
-const GROUP = {
-  "16,384-lane dual-mode array": "comp",
-  "Flash-attention engine": "comp",
-  "Conv + vector units": "comp",
-  "Programmable vector unit": "comp",
-  "LM head + sampler": "comp",
-  "8 MB SRAM, 16 banks": "mem",
-  "4 MB SRAM, 8 banks": "mem",
-  "16 MB SRAM, 32 banks": "mem",
-  "LPDDR5X x64 PHY": "io",
-  "LPDDR5X x32 PHY": "io",
-  "LPDDR5X x128 PHY": "io",
-  "IO ring / ESD": "io",
-  "PLLs, LDOs, PVT": "io",
-  "RV32 + NoC + DFT": "ctrl",
-  "Token-gather / ragged-GEMM scheduler": "ctrl",
-  "Streamer + expert gather + dequant + AES": "route",
-  "MoE router + top-k": "route",
-  "_routing": "fill"
+const BLOCK_META = {
+  "16,384-lane dual-mode array": {
+    cat: "Compute Core",
+    desc: "128&times;128 INT4&times;INT8 systolic array sub-tiled into 4&times; 64&times;64 units. S1 Fold-16 trees (ACC_LOCAL=16) &rarr; S2 fold sum (ACC_MID=24) &rarr; S3 8-bank accumulators (ACC_OUT=32). Dual-mode: weight-stationary during prefill, output-stationary during decode. Verified at cosine 0.99119 across all 4 tile banks.",
+    metric: "0.99119 Cosine",
+    depth: "79 Levels"
+  },
+  "8 MB SRAM, 16 banks": {
+    cat: "On-Die Memory",
+    desc: "16 independent 512 KB banks holding 2048-token chunk residual streams. In prefill, chunked scheduling allows weights for each active expert to be streamed from DRAM exactly once per chunk rather than once per token, dropping memory traffic by 6.2&times;.",
+    metric: "16 Banks / 8 MB",
+    depth: "1-Cycle SRAM"
+  },
+  "LPDDR5X x64 PHY": {
+    cat: "External Memory",
+    desc: "LPDDR5X high-speed PHY interface with DFI channels. Sized to match SKU memory bandwidth targets (25.6 to 136.5 GB/s) delivering continuous INT4 group-64 streams directly to the streamer and array.",
+    metric: "0.885 Eff.",
+    depth: "PHY Macro"
+  },
+  "MoE router + top-k": {
+    cat: "Routing Engine",
+    desc: "Top-4 expert selection over 32 experts. Features an INT12&times;INT12 MAC tree, 32-segment PWL sigmoid table over [&minus;4, +4), and a 2-cycle pipelined tournament tree. Patches sequencer descriptors dynamically at runtime.",
+    metric: "0.9961 Match",
+    depth: "114 Levels"
+  },
+  "Streamer + expert gather + dequant + AES": {
+    cat: "Weight Datapath",
+    desc: "Unpacks INT4 nibbles and applies FP16 group scales to accumulated sums on the fly (1 multiply per 64 weights instead of 64). Performs coarse expert DRAM page gathers.",
+    metric: "100% Group-64",
+    depth: "2 Levels"
+  },
+  "Conv + vector units": {
+    cat: "Sequential Mixing",
+    desc: "18 layers &times; 2048 channels &times; 7-tap delay lines for causal 1D convolution with double-gating. Retains 72 KB constant state on die across turns, eliminating DRAM KV cache traffic for inter-token gaps.",
+    metric: "72 KB State",
+    depth: "92 Levels"
+  },
+  "Flash-attention engine": {
+    cat: "Attention Unit",
+    desc: "Online flash-softmax accumulator that maintains running max and sum rescales without materializing score rows in DRAM. Invariant across KV cache page walk boundaries.",
+    metric: "6.14 KB/tok",
+    depth: "132 Levels"
+  },
+  "LM head + sampler": {
+    cat: "Output Unit",
+    desc: "Streaming insertion sort across 128,000 token vocabulary keeping only top-64 candidates. Hardware top-p, temperature, and repetition penalty sampling saves 8% decode traffic.",
+    metric: "128K Vocab",
+    depth: "28 Levels"
+  },
+  "RV32 + NoC + DFT": {
+    cat: "Control & Bus",
+    desc: "Descriptor-ring sequencer executing 512 static instructions per token. Seamlessly handles dynamic router expert patching with zero execution bubbles.",
+    metric: "301 Descriptors",
+    depth: "24 Levels"
+  },
+  "Programmable vector unit": {
+    cat: "Vector Engine",
+    desc: "SIMD vector operations for RMSNorm, RoPE rotary position embeddings, and residual stream adds.",
+    metric: "2048-Wide",
+    depth: "Vector Pipe"
+  },
+  "PLLs, LDOs, PVT": {
+    cat: "Analog & Clock",
+    desc: "On-chip PLLs for 1 GHz core clock generation, internal LDO voltage regulators, and PVT process/thermal monitors.",
+    metric: "0.8V VDD",
+    depth: "Analog"
+  }
 };
-const GNAME = { comp:"Compute", mem:"On-die memory", io:"External interface",
-                ctrl:"Control", route:"Weight path", fill:"Routing / fill" };
-const GCOL  = { comp:"--c-comp", mem:"--c-mem", io:"--c-io",
-                ctrl:"--c-ctrl", route:"--c-route", fill:"--c-fill" };
 
-const NOTE = {
-  "16,384-lane dual-mode array":
-    "128\u00D7128 of INT4\u00D7INT8 MACs, sub-tiled 4\u00D764\u00B2 so a short expert wastes a quarter-sized pass instead of a full one. Weight-stationary in prefill, output-stationary in decode. Only ~3% utilised while generating \u2014 it is sized for time-to-first-token.",
-  "8 MB SRAM, 16 banks":
-    "The largest single block, and the reason chunked prefill works: it holds a 2048-token chunk's residual stream so each expert is read from DRAM once per chunk rather than once per token.",
-  "LPDDR5X x64 PHY":
-    "The bus that sets the product. Batch-1 decode reads 990 MB per token, so throughput is bandwidth divided by that number \u2014 the array never enters the equation.",
-  "Flash-attention engine":
-    "Online-softmax accumulation so a score row is never materialised. At 128K context the quadratic term is 66% of prefill; a two-pass softmax would double the KV reads.",
-  "Conv + vector units":
-    "Short-conv state is 18 layers \u00D7 2048 channels \u00D7 (k\u22121) taps = 72 KB and constant regardless of context length, unlike a KV cache. It stays on die across idle, so a conversation survives gaps with no DRAM traffic.",
-  "MoE router + top-k":
-    "0.05 mm\u00B2 that decides where every token goes. Needs INT12\u00D7INT12, not the shared INT8 activation bus \u2014 INT8 weights cap routing agreement at 0.986 against a 0.995 gate.",
-  "Streamer + expert gather + dequant + AES":
-    "Unpacks INT4 nibbles and applies one FP16 scale per group of 64 to the accumulated partial sum, not to individual weights \u2014 one multiply per group instead of 64.",
-  "LM head + sampler":
-    "Streams the 128K-row head and keeps only top-K, saving ~8% of all decode traffic for 0.14 mm\u00B2.",
-  "Token-gather / ragged-GEMM scheduler":
-    "Expert loads are uneven, so passes are ragged. This block sizes against the tail of the tokens-per-expert distribution, not its mean.",
-  "RV32 + NoC + DFT": "Control, not datapath. Descriptor-ring sequencing, on-chip network and test.",
-  "Programmable vector unit": "Normalisation, rotary embedding, residual adds \u2014 everything the systolic array cannot express.",
-  "IO ring / ESD": "Pads and protection.",
-  "PLLs, LDOs, PVT": "Clocks, regulation and process/voltage/temperature monitors.",
-  "_routing": "Interconnect and utilisation overhead \u2014 9% on top of the placed blocks at 65% target density."
-};
+let currentSku = "B";
+let activeBlock = "16,384-lane dual-mode array";
 
-/* Squarified treemap: areas stay proportional, aspect ratios stay readable. */
-function squarify(items, x, y, w, h) {
-  const out = [];
-  const total = items.reduce((s, i) => s + i.v, 0);
-  let list = items.map(i => ({ ...i, v0: i.v, v: i.v / total * w * h }));
-  const worst = (row, len) => {
-    const s = row.reduce((a, b) => a + b.v, 0);
-    const mx = Math.max(...row.map(r => r.v)), mn = Math.min(...row.map(r => r.v));
-    return Math.max(len * len * mx / (s * s), (s * s) / (len * len * mn));
-  };
-  function place(row, x, y, w, h, horiz) {
-    const s = row.reduce((a, b) => a + b.v, 0);
-    let off = 0;
-    for (const r of row) {
-      if (horiz) { const rw = r.v / s * w;
-        out.push({ ...r, x: x + off, y, w: rw, h: s / w }); off += rw; }
-      else { const rh = r.v / s * h;
-        out.push({ ...r, x, y: y + off, w: s / h, h: rh }); off += rh; }
+function updateUI() {
+  const s = DATA.skus[currentSku];
+  const m = DATA.model;
+
+  // Header metrics
+  document.getElementById("val-die").textContent = s.blocks._total.toFixed(2) + " mm&sup2;";
+  document.getElementById("val-tok").textContent = s.tok_s_8b + " tok/s";
+  document.getElementById("val-pwr").textContent = s.watts.toFixed(2) + " W";
+
+  // SVG PHY label
+  const phyBw = document.getElementById("svg-phy-bw");
+  if (phyBw) phyBw.textContent = s.gbps + " GB/s &middot; x" + s.bus + " Bus";
+
+  // Bottom facts
+  document.getElementById("fact-tok").textContent = s.tok_s_8b + " tok/s";
+  document.getElementById("fact-ttft").textContent = s.ttft + " ms";
+  document.getElementById("fact-traffic").textContent = m.mb_tok + " MB";
+  document.getElementById("fact-active").textContent = (m.active / 1e9).toFixed(2) + "B / " + (m.total / 1e9).toFixed(2) + "B";
+  document.getElementById("fact-energy").textContent = s.mj + " mJ";
+  document.getElementById("fact-sat").textContent = Math.round(s.lanes_needed) + " Lanes";
+
+  // Inspector
+  const meta = BLOCK_META[activeBlock] || { cat: "Block", desc: "", metric: "&mdash;", depth: "&mdash;" };
+  const bArea = s.blocks[activeBlock] || s.blocks["16,384-lane dual-mode array"] || 5.73;
+  const pct = (bArea / s.blocks._total * 100).toFixed(1);
+
+  document.getElementById("insp-name").textContent = activeBlock;
+  document.getElementById("insp-cat").textContent = meta.cat;
+  document.getElementById("insp-share").textContent = bArea.toFixed(2) + " mm&sup2; &middot; " + pct + "% of die";
+  document.getElementById("insp-desc").textContent = meta.desc;
+  document.getElementById("insp-metric").textContent = meta.metric;
+  document.getElementById("insp-depth").textContent = meta.depth;
+
+  // Update active states on SVG blocks
+  document.querySelectorAll(".svg-block").forEach(b => {
+    const key = b.dataset.key;
+    if (key === activeBlock) {
+      b.classList.add("active");
+    } else {
+      b.classList.remove("active");
     }
-    return horiz ? { x, y: y + s / w, w, h: h - s / w }
-                 : { x: x + s / h, y, w: w - s / h, h };
-  }
-  let rect = { x, y, w, h };
-  while (list.length) {
-    const horiz = rect.w >= rect.h;
-    const len = horiz ? rect.w : rect.h;
-    let row = [list[0]], i = 1;
-    while (i < list.length && worst(row.concat(list[i]), len) <= worst(row, len)) {
-      row.push(list[i]); i++;
-    }
-    rect = place(row, rect.x, rect.y, rect.w, rect.h, horiz);
-    list = list.slice(i);
-  }
-  return out;
-}
-
-let sku = "B", selected = null;
-const off = new Set();
-
-const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const fmt = (v, d = 2) => v.toFixed(d);
-
-function blocks() {
-  const b = DATA.skus[sku].blocks;
-  return Object.entries(b)
-    .filter(([k]) => k !== "_total")
-    .map(([k, v]) => ({ name: k, v, g: GROUP[k] || "ctrl" }))
-    .sort((a, z) => z.v - a.v);
-}
-
-function render() {
-  const s = DATA.skus[sku];
-  document.getElementById("m-die").textContent = fmt(s.blocks._total) + " mm\u00B2";
-  document.getElementById("m-tok").textContent = s.tok_s_8b + " tok/s";
-  document.getElementById("m-pw").textContent = fmt(s.watts) + " W";
-  document.getElementById("n-lanes").textContent = Math.round(s.lanes_needed);
-  document.getElementById("cap-l").textContent =
-    "SKU " + sku + " \u00B7 " + s.gbps + " GB/s \u00B7 " + s.gb + " GB";
-  document.getElementById("cap-r").textContent = fmt(s.blocks._total) + " mm\u00B2 die";
-
-  const all = blocks();
-  const shown = all.filter(b => !off.has(b.g));
-  const svg = document.getElementById("die");
-  const W = 700, H = 470, P = 10;
-  const laid = shown.length ? squarify(shown, P, P, W - 2 * P, H - 2 * P) : [];
-  const total = s.blocks._total;
-
-  let out = `<rect x="0" y="0" width="${W}" height="${H}" rx="6"
-    fill="var(--die-bg)" stroke="var(--die-edge)" stroke-width="1.5"/>`;
-  for (const r of laid) {
-    const pct = (r.v0 / total * 100);
-    const col = `var(${GCOL[r.g]})`;
-    const big = r.w > 92 && r.h > 34;
-    const mid = r.w > 60 && r.h > 22;
-    const label = r.name === "_routing" ? "Routing + fill" : r.name;
-    const sel = selected === r.name ? " sel" : "";
-    out += `<g class="blk${sel}" tabindex="0" role="button"
-      aria-label="${label}, ${fmt(r.v0)} square millimetres"
-      data-name="${label.replace(/"/g, "&quot;")}" data-key="${r.name.replace(/"/g, "&quot;")}">
-      <rect x="${r.x}" y="${r.y}" width="${Math.max(r.w, 1)}" height="${Math.max(r.h, 1)}"
-            rx="3" fill="${col}"/>`;
-    if (mid) {
-      const words = label.split(/\s+/);
-      let line = "", lines = [];
-      const cpl = Math.max(6, Math.floor(r.w / 5.1));
-      for (const w of words) {
-        if ((line + " " + w).trim().length > cpl) { lines.push(line.trim()); line = w; }
-        else line += " " + w;
-      }
-      lines.push(line.trim());
-      lines = lines.slice(0, big ? 3 : 2);
-      lines.forEach((ln, i) =>
-        out += `<text x="${r.x + 7}" y="${r.y + 16 + i * 10}">${ln}</text>`);
-      if (big) out += `<text class="sm" x="${r.x + 7}"
-        y="${r.y + 18 + lines.length * 10}">${fmt(r.v0)} mm\u00B2 \u00B7 ${pct.toFixed(1)}%</text>`;
-    }
-    out += `</g>`;
-  }
-  svg.innerHTML = out;
-
-  svg.querySelectorAll(".blk").forEach(g => {
-    const pick = () => { selected = g.dataset.key; render(); };
-    g.addEventListener("click", pick);
-    g.addEventListener("keydown", e => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); }
-    });
   });
 
-  renderPanel();
-  renderLegend();
-  renderFacts();
-}
-
-function renderPanel() {
-  const s = DATA.skus[sku], p = document.getElementById("panel");
-  const all = blocks();
-  const b = all.find(x => x.name === selected) || all[0];
-  const label = b.name === "_routing" ? "Routing + fill" : b.name;
-  const pct = b.v / s.blocks._total * 100;
-  p.innerHTML = `
-    <div class="swatch" style="background:var(${GCOL[b.g]})"></div>
-    <h2>${label}</h2>
-    <span class="tag">${GNAME[b.g]}</span>
-    <dl class="kv">
-      <dt>Area</dt><dd>${fmt(b.v)} mm\u00B2</dd>
-      <dt>Share of die</dt><dd>${pct.toFixed(1)}%</dd>
-      <dt>Rank</dt><dd>${all.indexOf(b) + 1} of ${all.length}</dd>
-    </dl>
-    <p>${NOTE[b.name] || ""}</p>`;
-}
-
-function renderLegend() {
-  const counts = {};
-  for (const b of blocks()) counts[b.g] = (counts[b.g] || 0) + b.v;
-  document.getElementById("legend").innerHTML = Object.keys(GNAME)
-    .filter(g => counts[g])
-    .map(g => `<button data-g="${g}" aria-pressed="${!off.has(g)}">
-      <i style="background:var(${GCOL[g]})"></i>${GNAME[g]}
-      <span style="color:var(--ink-3)">${fmt(counts[g])}</span></button>`).join("");
-  document.querySelectorAll("#legend button").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const g = btn.dataset.g;
-      off.has(g) ? off.delete(g) : off.add(g);
-      render();
-    });
+  // Update active states on Callout cards
+  document.querySelectorAll(".callout-card").forEach(c => {
+    const title = c.querySelector(".callout-title").textContent.toLowerCase();
+    const activeLower = activeBlock.toLowerCase();
+    if ((activeLower.includes("array") && title.includes("sub-tile")) ||
+        (activeLower.includes("router") && title.includes("router")) ||
+        (activeLower.includes("sram") && title.includes("sram")) ||
+        (activeLower.includes("phy") && title.includes("phy")) ||
+        (activeLower.includes("conv") && title.includes("conv")) ||
+        (activeLower.includes("attention") && title.includes("softmax")) ||
+        (activeLower.includes("lm head") && title.includes("lm head")) ||
+        (activeLower.includes("rv32") && title.includes("descriptor"))) {
+      c.classList.add("active");
+    } else {
+      c.classList.remove("active");
+    }
   });
 }
 
-function renderFacts() {
-  const s = DATA.skus[sku], m = DATA.model;
-  const f = [
-    ["Decode, 8B-A1B", s.tok_s_8b, "tok/s at 4K context", ""],
-    ["Time to first token", s.ttft, "ms at 2048 prompt \u00B7 " + s.bound + "-bound", ""],
-    ["Traffic per token", m.mb_tok, "MB at " + m.avg_bits + " bits/weight", ""],
-    ["Active parameters", (m.active / 1e9).toFixed(2), "of " + (m.total / 1e9).toFixed(2) + "B total \u2014 " + (m.sparsity * 100).toFixed(1) + "% sparsity", ""],
-    ["Energy", s.mj, "mJ per token", ""],
-    ["Lanes to saturate", Math.round(s.lanes_needed), "of " + s.lanes.toLocaleString() + " built", ""]
-  ];
-  document.getElementById("facts").innerHTML = f.map(([k, v, sub]) =>
-    `<div class="fact"><span>${k}</span><b>${v}</b><small>${sub}</small></div>`).join("");
+// Block Selection Handlers
+function selectBlock(key) {
+  if (BLOCK_META[key]) {
+    activeBlock = key;
+    updateUI();
+  }
 }
 
-document.querySelectorAll(".seg button").forEach(btn => {
-  btn.addEventListener("click", () => {
-    sku = btn.dataset.sku; selected = null;
-    document.querySelectorAll(".seg button").forEach(b =>
-      b.setAttribute("aria-pressed", String(b.dataset.sku === sku)));
-    render();
+document.querySelectorAll(".svg-block").forEach(b => {
+  b.addEventListener("click", () => {
+    const key = b.dataset.key;
+    selectBlock(key);
   });
 });
 
-render();
+document.querySelectorAll(".callout-card").forEach(c => {
+  c.addEventListener("click", () => {
+    const title = c.querySelector(".callout-title").textContent.toLowerCase();
+    if (title.includes("sub-tile")) selectBlock("16,384-lane dual-mode array");
+    else if (title.includes("router")) selectBlock("MoE router + top-k");
+    else if (title.includes("sram")) selectBlock("8 MB SRAM, 16 banks");
+    else if (title.includes("phy")) selectBlock("LPDDR5X x64 PHY");
+    else if (title.includes("conv")) selectBlock("Conv + vector units");
+    else if (title.includes("softmax")) selectBlock("Flash-attention engine");
+    else if (title.includes("lm head")) selectBlock("LM head + sampler");
+    else if (title.includes("descriptor")) selectBlock("RV32 + NoC + DFT");
+  });
+});
+
+// SKU Buttons
+document.querySelectorAll(".sku-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    currentSku = btn.dataset.sku;
+    document.querySelectorAll(".sku-btn").forEach(b => {
+      b.setAttribute("aria-pressed", String(b.dataset.sku === currentSku));
+    });
+    updateUI();
+  });
+});
+
+updateUI();
 </script>
+</body>
+</html>

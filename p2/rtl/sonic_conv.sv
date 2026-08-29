@@ -16,8 +16,12 @@
 // capacity, this is where it should come from.
 `include "sonic_defs.svh"
 
+`ifndef CONV_CH
+  `define CONV_CH 64
+`endif
+
 module sonic_conv #(
-  parameter int CH    = 64,          // channels processed per pass
+  parameter int CH    = `CONV_CH,    // channels processed per pass
   parameter int KMAX  = 7,
   parameter int DW    = `A_BITS
 ) (
@@ -66,6 +70,7 @@ module sonic_conv #(
       localparam int PW = DW + 8;
       logic signed [`ACC_MID-1:0] sum;
       logic signed [PW-1:0]       prod [KMAX];
+      logic signed [`ACC_MID-1:0] tsum [KMAX];
 
       always_comb begin
         prod[0] = xv[c] * tap[0];
@@ -80,8 +85,16 @@ module sonic_conv #(
           if (t < int'(k_taps)) prod[t] = hist[c][t-1] * tap[t];
           else                  prod[t] = '0;
         end
-        sum = '0;
-        for (int t = 0; t < KMAX; t++) sum += `ACC_MID'(prod[t]);
+        // Balanced tree, for the same reason as sonic_tile's fold and the
+        // router's MAC: a running sum over KMAX taps is KMAX dependent
+        // ACC_MID-wide adders. KMAX is only 7, so this is 3 levels instead of
+        // 7 rather than 6 instead of 64 -- small, but it is the same defect and
+        // it costs nothing to not have it.
+        for (int t = 0; t < KMAX; t++) tsum[t] = `ACC_MID'(prod[t]);
+        for (int step = 1; step < KMAX; step = step * 2)
+          for (int t = 0; t + step < KMAX; t = t + 2*step)
+            tsum[t] = tsum[t] + tsum[t + step];
+        sum = tsum[0];
       end
 
       // Output gate, then requantize back to DW with symmetric rounding.

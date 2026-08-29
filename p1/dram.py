@@ -26,24 +26,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 ROOT = Path(__file__).resolve().parent.parent
 SIM = ROOT / "dramsim3" / "build" / "dramsim3main"
-CFG = ROOT / "dramsim3" / "configs" / "LPDDR4_8Gb_x16_2400.ini"
 GEN = ROOT / "p1" / "dram_trace.py"
 
-TCK_NS = 0.83
-BUS_BITS = 64
-PEAK_GBPS = BUS_BITS * 2 / TCK_NS / 8      # DDR: two transfers per clock
 
-
-def read(pattern: str, tmp: Path) -> dict:
-    """Parse one DRAMsim3 run. The Makefile runs the simulator itself: spawning
-    it from Python traps under some sandboxes, and a shell step is the simpler
-    contract anyway."""
+def read(pattern: str, tmp: Path, tck_ns: float = 0.234, bus_bits: int = 64) -> dict:
+    """Parse one DRAMsim3 run."""
     out = tmp / f"out_{pattern}"
     c = json.loads((out / "dramsim3.json").read_text())["0"]
     done, cyc = c["num_reads_done"], c["num_cycles"]
     return dict(
         pattern=pattern, reads=done,
-        gbps=done * 64 / (cyc * TCK_NS * 1e-9) / 1e9,
+        gbps=done * 64 / (cyc * tck_ns * 1e-9) / 1e9,
         row_hit=c["num_read_row_hits"] / max(c["num_read_cmds"], 1),
         acts=c["num_act_cmds"])
 
@@ -51,17 +44,21 @@ def read(pattern: str, tmp: Path) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--tck", type=float, default=0.83, help="Clock period in ns")
+    ap.add_argument("--bus-bits", type=int, default=64, help="Bus width in bits")
+    ap.add_argument("--device-name", default="LPDDR4-2400 / LPDDR5X-8533")
     a = ap.parse_args()
 
+    peak_gbps = a.bus_bits * 2 / a.tck / 8
     tmp = ROOT / "p1" / "out" / "dram"
-    rows = [read(p, tmp) for p in ("stream", "expert", "scatter")]
+    rows = [read(p, tmp, a.tck, a.bus_bits) for p in ("stream", "expert", "scatter")]
 
     base = rows[0]["gbps"]
-    print(f"\nLPDDR4-2400 x16, one channel. Theoretical peak {PEAK_GBPS:.2f} GB/s.")
+    print(f"\n{a.device_name}. Theoretical peak {peak_gbps:.2f} GB/s.")
     print(f"{'pattern':9s} {'GB/s':>7s} {'of peak':>8s} {'row hit':>8s} "
           f"{'ACTs':>8s} {'vs stream':>10s}")
     for r in rows:
-        print(f"{r['pattern']:9s} {r['gbps']:7.2f} {r['gbps']/PEAK_GBPS:8.1%} "
+        print(f"{r['pattern']:9s} {r['gbps']:7.2f} {r['gbps']/peak_gbps:8.1%} "
               f"{r['row_hit']:8.4f} {r['acts']:8,d} {r['gbps']/base:10.4f}")
 
     exp = next(r for r in rows if r["pattern"] == "expert")

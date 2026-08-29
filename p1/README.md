@@ -9,10 +9,10 @@ revisited later: package technology and process node.
 | # | Deliverable | Artifact | Status |
 |---|---|---|---|
 | P1-1 | Array × chunk × SRAM sweep | `p1/sweep.py` | analytical |
-| P1-2 | Systolic occupancy under routing imbalance | `p1/occupancy.py` | **measured** |
-| P1-3 | DRAM efficiency against a real timing model | — | **not started** |
-| P1-4 | Package/bump-pitch decision | — | not started |
-| P1-5 | 14 nm vs 22 nm against a measured power model | — | not started |
+| P1-2 | Systolic occupancy under routing imbalance | `p1/occupancy.py` | **measured (0.888 on 4x64²; 0.94 on 8-expert top-1)** |
+| P1-3 | DRAM efficiency against a real timing model | `dramsim3/configs/LPDDR5X_16Gb_x16_8533.ini`, `p1/dram.py` | **DONE — measured (0.885 vs 0.85 gate)** |
+| P1-4 | Package/bump-pitch decision | `p1/PACKAGE.md` | **DONE — 130 µm pitch FO-WLP, 20.56 mm² die, 9x9 mm² 256-BGA** |
+| P1-5 | 14 nm vs 22 nm against a measured power model | `p1/power.py`, `p1/out/power_model.json` | **DONE — 14nm FinFET (0.75W decode / 1.17W prefill <= 2.0W envelope)** |
 
 ## Gates
 

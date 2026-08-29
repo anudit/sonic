@@ -64,8 +64,7 @@ def main() -> int:
     d, E, K = cfg.hidden_size, cfg.num_experts, cfg.num_experts_per_tok
 
     blk = model.model.layers[a.layer].feed_forward
-    if type(blk).__name__ != "Lfm2MoeSparseMoeBlock" and not hasattr(blk, "experts"):
-        raise SystemExit(f"layer {a.layer} is not an MoE layer ({type(blk).__name__})")
+    is_dense = not (type(blk).__name__ == "Lfm2MoeSparseMoeBlock" or hasattr(blk, "experts"))
 
     # Capture the block's input and output: the reference this must reproduce.
     io = {}
@@ -83,29 +82,48 @@ def main() -> int:
     y = io["y"][:a.tokens].numpy().astype(np.float32)
     n = x.shape[0]
 
-    gate = blk.gate                       # Lfm2MoeTopKRouter
-    experts = blk.experts                 # Lfm2MoeExperts
-    Wr = gate.weight.detach().numpy().astype(np.float32)          # [E, d]
-    # expert_bias is a buffer on the BLOCK, and the gate takes it as a forward
-    # argument rather than holding it -- calling gate(x) alone raises.
-    eb = getattr(blk, "expert_bias", None)
-    bias = (eb.detach().numpy().astype(np.float32) if eb is not None
-            else np.zeros(E, np.float32))
+    if is_dense:
+        # Dense MLP layer (e.g. 2.6B or leading layers of MoE)
+        E, K = 1, 1
+        sel = np.zeros((n, 1), dtype=np.int32)
+        rwt = np.ones((n, 1), dtype=np.float32)
+        Wr = np.zeros((1, d), dtype=np.float32)
+        bias = np.zeros(1, dtype=np.float32)
+        uniq = [0]
 
-    with torch.no_grad():
-        rl, rw, rsel = gate(io["x"][:a.tokens], eb)
-    sel = rsel.reshape(n, K).numpy().astype(np.int32)
-    rwt = rw.reshape(n, K).numpy().astype(np.float32)
-    uniq = sorted(set(sel.ravel().tolist()))
-    print(f"  {n} token(s), top-{K} of {E}; unique experts {uniq}")
+        # Handle gate_up_proj and down_proj
+        if hasattr(blk, "gate_up_proj"):
+            gu = blk.gate_up_proj.weight.detach().numpy().astype(np.float32) # [2*I, d]
+            dn = blk.down_proj.weight.detach().numpy().astype(np.float32)    # [d, I]
+        elif hasattr(blk, "w1") and hasattr(blk, "w2") and hasattr(blk, "w3"):
+            w1 = blk.w1.weight.detach().numpy().astype(np.float32)
+            w3 = blk.w3.weight.detach().numpy().astype(np.float32)
+            gu = np.concatenate([w1, w3], axis=0)
+            dn = blk.w2.weight.detach().numpy().astype(np.float32)
+        else:
+            raise SystemExit(f"Unknown dense block architecture: {type(blk).__name__}")
+        I = dn.shape[-1]
+        print(f"  {n} token(s), dense FFN; intermediate={I}")
+    else:
+        gate = blk.gate                       # Lfm2MoeTopKRouter
+        experts = blk.experts                 # Lfm2MoeExperts
+        Wr = gate.weight.detach().numpy().astype(np.float32)          # [E, d]
+        eb = getattr(blk, "expert_bias", None)
+        bias = (eb.detach().numpy().astype(np.float32) if eb is not None
+                else np.zeros(E, np.float32))
+
+        with torch.no_grad():
+            rl, rw, rsel = gate(io["x"][:a.tokens], eb)
+        sel = rsel.reshape(n, K).numpy().astype(np.int32)
+        rwt = rw.reshape(n, K).numpy().astype(np.float32)
+        uniq = sorted(set(sel.ravel().tolist()))
+        print(f"  {n} token(s), top-{K} of {E}; unique experts {uniq}")
+
+        gu_all = experts.gate_up_proj.detach().numpy().astype(np.float32)   # [E, 2*I, d]
+        dn_all = experts.down_proj.detach().numpy().astype(np.float32)      # [E, d, I]
+        I = dn_all.shape[-1]
 
     h_q, act_scale = q_int8(x)
-    Wr_q, Wr_s = q_int4_g64(Wr)           # router uses INT12 in the recipe; the
-                                          # RTL bench quantizes separately, this
-                                          # is only for size reference
-    gu = experts.gate_up_proj.detach().numpy().astype(np.float32)   # [E, 2*I, d]
-    dn = experts.down_proj.detach().numpy().astype(np.float32)      # [E, d, I]
-    I = dn.shape[-1]
 
     a.out.parent.mkdir(parents=True, exist_ok=True)
     with a.out.open("wb") as f:
@@ -120,8 +138,10 @@ def main() -> int:
         rwt.tofile(f)
         np.array(uniq, np.int32).tofile(f)
         for e in uniq:
-            q, s = q_int4_g64(gu[e]); q.tofile(f); s.tofile(f)
-            q, s = q_int4_g64(dn[e]); q.tofile(f); s.tofile(f)
+            gu_mat = gu if is_dense else gu_all[e]
+            dn_mat = dn if is_dense else dn_all[e]
+            q, s = q_int4_g64(gu_mat); q.tofile(f); s.tofile(f)
+            q, s = q_int4_g64(dn_mat); q.tofile(f); s.tofile(f)
 
     meta = dict(model=a.model, layer=a.layer, tokens=n, d=d, experts=E, top_k=K,
                 inter=I, unique_experts=uniq, act_scale=float(act_scale),

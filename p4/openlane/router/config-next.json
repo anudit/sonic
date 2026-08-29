@@ -1,0 +1,29 @@
+{
+  "DESIGN_NAME": "sonic_router",
+  "VERILOG_FILES": [
+    "dir::../../../p2/rtl/sonic_router.sv"
+  ],
+  "VERILOG_INCLUDE_DIRS": [
+    "dir::../../../p2/rtl"
+  ],
+  "VERILOG_DEFINES": [
+    "ROUTER_PWL_SEGS=32",
+    "ROUTER_PWL_RANGE=4"
+  ],
+  "SYNTH_PARAMETERS": [
+    "LANES=4"
+  ],
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 800,
+  "FP_CORE_UTIL": 40,
+  "PL_TARGET_DENSITY_PCT": 45,
+  "FP_ASPECT_RATIO": 1,
+  "RUN_HEURISTIC_DIODE_INSERTION": true,
+  "GRT_ALLOW_CONGESTION": true,
+  "// clock": "800 ns. Derived, not guessed: the finished SEGS=8 run reports worst setup slack 933.0 ns at CLOCK_PERIOD=1500 on ss_100C_1v60, so the pipelined router's longest path is 567.0 ns there -- and that is an upper bound, since at 1500 ns the resizer had no reason to work. 800 clears 567 with room for the wider read mux SEGS=32 adds, and is tight enough that repair_timing must engage and report instead of exiting at once. If it closes, tighten again. The original note, kept because it is the measurement that set 1500: 1500 ns, raised from 10 ns after measurement: post-CTS repair_timing at 10 ns showed WNS -1086.6 ns on the top-k cone's sel[] path, i.e. an actual critical-path delay of roughly 1097 ns at Sky130. Buffer/gate resizing cannot close a gap that size (it fixes drive strength, not logic depth), so repair_timing was grinding ~0.14 ns/iteration with no realistic convergence. 1500 ns clears that path with margin so the resizer exits quickly and the flow can reach routing. Sky130 at 130 nm cannot hit the 1 GHz S1 targets regardless; this number exists to unblock P&R, not to model timing.",
+  "// lanes": "LANES=4 rather than the shipping 64: same structure, 1/16 the multiplier array, tractable runtime. See p4/README.md.",
+  "// segs": "ROUTER_PWL_SEGS=32 over ROUTER_PWL_RANGE=4 is the shipping recipe as of p2-pwl-sweep: measured against 512 real hidden states it gives the same 0.9961 top-4 routing agreement as the old 64-over-+-8, with half the table flops and half the read mux. The SEGS=8 run in results/segs8 predates this and used 8 segments over +-8 purely to get through ABC; this config is the first one that is both tractable AND accurate. SEGS and RANGE must both stay powers of two (shift-based segment select in sonic_router.sv).",
+  "// util": "40% utilisation leaves the router room. The top-k network is a wide combinational cone over a 1024-bit score register and is the congestion hot spot -- and, per the clock note above, also the critical-path hot spot.",
+  "// keys": "LibreLane errors on unrecognised config keys. Only keys beginning with // are exempt, which is why the comments look like this.",
+  "// pipeline": "sonic_router.sv is now pipelined (S1 MAC / S2 accumulate / E1 scale / E2 segment select / E3 PWL+bias, then 2 cycles per top-k pass). The SEGS=8 run's CLOCK_PERIOD=1500 exists because the un-pipelined block had a ~1097 ns critical path. Do NOT carry 1500 forward blindly -- re-run the post-CTS resizer and let it tell you what this version actually needs."
+}

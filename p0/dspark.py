@@ -83,6 +83,17 @@ def main() -> int:
     for what, why in reqs:
         print(f"  * {what}\n      {why}")
 
+    results = []
+    for bits, lab in ((8.0, "INT8"), (4.25, "INT4")):
+        for p in (0.70, 0.80, 0.90, 0.95):
+            g = dspark_gain(m, DRAFTER_PARAMS, bits, block, p)
+            results.append({"drafter": lab, "p": p, **g})
+
+    out_p = Path("p0/out/dspark.json")
+    out_p.parent.mkdir(parents=True, exist_ok=True)
+    out_p.write_text(json.dumps(results, indent=2))
+    print(f"\nWrote DSpark speculation budget to {out_p}")
+
     print("\nverdict: budget 1.1-1.7x on S1, not 2.5x. It is lossless, so it costs")
     print("nothing in quality -- but it is not the lever the SKU table should lean on.")
     return 0
@@ -90,3 +101,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

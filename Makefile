@@ -1,4 +1,4 @@
-.PHONY: demo-data p3-layer p3-generate p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
+.PHONY: demo-data p3-top p3-layer p3-generate p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
 
 # Homebrew's binutils shadows Apple's ar with GNU ar, whose archives macOS ld
 # rejects. Verilator links fail without this.
@@ -72,6 +72,12 @@ p2-units: build/sonic_golden.o
 	  p2/rtl/sonic_streamer.sv p2/tb/tb_streamer.cpp >/dev/null 2>&1
 	@$(MAKE) -C build/obj_streamer -f Vsonic_streamer.mk $(AR_FIX) -j8 >/dev/null 2>&1
 	@printf "  sonic_streamer "; ./build/obj_streamer/Vsonic_streamer | tail -1
+	@rm -rf build/obj_seq
+	@verilator --cc --exe -O2 -Wno-fatal -Ip2/rtl -CFLAGS "-O2" \
+	  --Mdir build/obj_seq --top-module sonic_seq \
+	  p2/rtl/sonic_seq.sv p2/tb/tb_seq.cpp >/dev/null 2>&1
+	@$(MAKE) -C build/obj_seq -f Vsonic_seq.mk $(AR_FIX) -j8 >/dev/null 2>&1
+	@printf "  sonic_seq      "; ./build/obj_seq/Vsonic_seq | tail -1
 	@for u in tile lmhead; do \
 	  rm -rf build/obj_$$u; \
 	  verilator --cc --exe -O2 -Wall -Wno-DECLFILENAME -Ip2/rtl \
@@ -85,27 +91,34 @@ p2-units: build/sonic_golden.o
 p2-router: p2/vectors/router_l5.bin
 	@rm -rf build/obj_router
 	@verilator --cc --exe -O2 -Wall -Wno-DECLFILENAME -Ip2/rtl \
-	  -CFLAGS "-DSEGS_OVERRIDE=64 -O2" --Mdir build/obj_router \
+	  -CFLAGS "-DSEGS_OVERRIDE=32 -DRANGE_OVERRIDE=4 -O2" --Mdir build/obj_router \
 	  --top-module sonic_router p2/rtl/sonic_router.sv p2/tb/tb_router.cpp >/dev/null
 	@$(MAKE) -C build/obj_router -f Vsonic_router.mk $(AR_FIX) -j8 >/dev/null
 	@./build/obj_router/Vsonic_router p2/vectors/router_l5.bin 512
 
-# Size the sigmoid PWL against measured routing agreement.
+# Size the sigmoid PWL against measured routing agreement, over BOTH axes.
+#
+# Finding 20 (the FFN's SiLU) showed the input RANGE is the lever and the
+# segment COUNT is not. This sweeps the router's sigmoid the same way: the
+# router's logits sit inside about +-4, so a table spanning [-8, 8) spends most
+# of its segments on inputs that never occur.
 p2-pwl-sweep: p2/vectors/router_l5.bin
-	@echo "  segs   top-1    top-4 set   exact order"
-	@for S in 16 32 64 128; do \
-	  rm -rf build/obj_r$$S; \
+	@echo "  range   segs   top-1    top-4 set   exact order"
+	@for R in 8 4 2; do \
+	for S in 8 16 32 64; do \
+	  rm -rf build/obj_r$$R_$$S; \
 	  verilator --cc --exe -O2 -Wno-fatal -Wno-DECLFILENAME -Ip2/rtl \
-	    -DROUTER_PWL_SEGS=$$S -CFLAGS "-DSEGS_OVERRIDE=$$S -O2" \
-	    --Mdir build/obj_r$$S --top-module sonic_router \
+	    -DROUTER_PWL_SEGS=$$S -DROUTER_PWL_RANGE=$$R \
+	    -CFLAGS "-DSEGS_OVERRIDE=$$S -DRANGE_OVERRIDE=$$R -O2" \
+	    --Mdir build/obj_r$$R_$$S --top-module sonic_router \
 	    p2/rtl/sonic_router.sv p2/tb/tb_router.cpp >/dev/null 2>&1; \
-	  $(MAKE) -C build/obj_r$$S -f Vsonic_router.mk $(AR_FIX) -j8 >/dev/null 2>&1; \
-	  O=$$(./build/obj_r$$S/Vsonic_router p2/vectors/router_l5.bin 512 2>/dev/null); \
-	  printf "  %4s   %s   %s      %s\n" "$$S" \
+	  $(MAKE) -C build/obj_r$$R_$$S -f Vsonic_router.mk $(AR_FIX) -j8 >/dev/null 2>&1; \
+	  O=$$(./build/obj_r$$R_$$S/Vsonic_router p2/vectors/router_l5.bin 512 2>/dev/null); \
+	  printf "  +-%-4s  %4s   %s   %s      %s\n" "$$R" "$$S" \
 	    "$$(echo "$$O" | grep 'top-1' | awk '{print $$4}')" \
 	    "$$(echo "$$O" | grep 'set match' | awk '{print $$4}')" \
 	    "$$(echo "$$O" | grep 'exact order' | awk '{print $$4}')"; \
-	done
+	done; done
 
 # Second simulator, independent front end, plus a VCD for GTKWave.
 iv:
@@ -224,6 +237,33 @@ p3-layer: p2/vectors/layer_l5.bin build/sonic_golden.o
 	  p2/rtl/sonic_tile.sv p2/tb/tb_layer.cpp $(CURDIR)/build/sonic_golden.o >/dev/null 2>&1
 	@$(MAKE) -C build/obj_layer -f Vsonic_tile.mk $(AR_FIX) -j8 >/dev/null 2>&1
 	@./build/obj_layer/Vsonic_tile p2/vectors/layer_l5.bin $(or $(ROWS),256)
+
+p2/vectors/layer_l0_dense.bin:
+	@.venv/bin/python p3/export_layer.py --layer 0 --out $@
+
+p3-dense: p2/vectors/layer_l0_dense.bin build/sonic_golden.o
+	@rm -rf build/obj_layer
+	@verilator --cc --exe -O2 -Wno-fatal -Ip2/rtl \
+	  -CFLAGS "-I$(CURDIR)/p0/golden -O2" --Mdir build/obj_layer \
+	  --top-module sonic_tile p2/rtl/sonic_acc.sv p2/rtl/sonic_pe.sv \
+	  p2/rtl/sonic_tile.sv p2/tb/tb_layer.cpp $(CURDIR)/build/sonic_golden.o >/dev/null 2>&1
+	@$(MAKE) -C build/obj_layer -f Vsonic_tile.mk $(AR_FIX) -j8 >/dev/null 2>&1
+	@./build/obj_layer/Vsonic_tile $< 1
+
+p3-ring:
+	@python3 p3/producer.py
+	@$(MAKE) p2-units
+
+p3-top: p2/vectors/layer_l5.bin build/sonic_golden.o
+	@rm -rf build/obj_top
+	@verilator --cc --exe -O2 -Wno-fatal -Ip2/rtl \
+	  -CFLAGS "-I$(CURDIR)/p0/golden -O2" --Mdir build/obj_top \
+	  --top-module sonic_top p2/rtl/sonic_acc.sv p2/rtl/sonic_pe.sv \
+	  p2/rtl/sonic_conv.sv p2/rtl/sonic_softmax.sv p2/rtl/sonic_lmhead.sv \
+	  p2/rtl/sonic_streamer.sv p2/rtl/sonic_router.sv p2/rtl/sonic_tile.sv \
+	  p2/rtl/sonic_seq.sv p2/rtl/sonic_top.sv p2/tb/tb_top.cpp $(CURDIR)/build/sonic_golden.o >/dev/null 2>&1
+	@$(MAKE) -C build/obj_top -f Vsonic_top.mk $(AR_FIX) -j8 >/dev/null 2>&1
+	@./build/obj_top/Vsonic_top p2/vectors/layer_l5.bin
 
 # --- demo: regenerate the floorplan's data and re-inject it
 demo-data:

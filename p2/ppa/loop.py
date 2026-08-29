@@ -49,6 +49,13 @@ UNITS = {
     # against sonic_acc's 59. The one unit with a pathological critical path was
     # the one unit excluded from the loop built to measure critical paths.
     "sonic_router":   ["sonic_router.sv"],
+    # sonic_tile was absent from this table until it was noticed that the one
+    # unit holding 4,096 of the chip's 16,384 multipliers had never been through
+    # synthesis at all. It reduced T products per lane as a sequential
+    # `partial += ...` over ACC_OUT-wide operands -- T dependent 32-bit adders
+    # in one cone -- which is the router's defect in a different module. It is a
+    # folded tree at ACC_LOCAL now; this entry is what keeps it one.
+    "sonic_tile":     ["sonic_tile.sv"],
 }
 
 # What the roofline says each unit is worth, so the loop cannot mislead.
@@ -59,8 +66,9 @@ CONTEXT = {
     "sonic_softmax":  "only matters above 8K context, where attention is 32% of prefill",
     "sonic_lmhead":   "0.14 mm2 that saves ~8% of all decode traffic",
     "sonic_streamer": "THE critical path -- if this stalls, the chip stops",
-    "sonic_seq":      "control, not datapath; f_max here is irrelevant",
+    "sonic_seq":      "control, not datapath -- and it was still one cycle wrong",
     "sonic_router":   "2,518 levels deep -- CANNOT be clocked; needs pipelining",
+    "sonic_tile":     "4,096 of the chip's 16,384 MACs; measured here at TILE=8",
 }
 
 
@@ -81,9 +89,16 @@ class Result:
 # Units that need a define before they will elaborate standalone.
 # SEGS=8, not the shipping 64: ABC's technology mapping on the segment-select
 # mux tree runs for hours at 64 and never converges -- reproduced locally and on
-# the P4 box. 8 is the tractable point for a relative signal, and the shipping
-# config is DEEPER than whatever this reports, never shallower.
-REQUIRED_DEFINES = {"sonic_router": {"ROUTER_PWL_SEGS": 8}}
+# the P4 box. 8 is the tractable point for a relative signal.
+# CH=4 for sonic_conv so the 64-channel array maps quickly in the generic flow.
+# TILE=8 rather than the shipping 64 for the same reason LANES=4 is used in the
+# P4 router config: the structure is identical and the multiplier array is 1/64
+# the size. A T=64 tile is ~4,096 multipliers in one flatten and takes hours.
+REQUIRED_DEFINES = {
+    "sonic_router": {"ROUTER_PWL_SEGS": 8, "ROUTER_LANES": 4},
+    "sonic_conv": {"CONV_CH": 4},
+    "sonic_tile": {"TILE": 8},
+}
 
 
 def synth(unit: str, params: dict | None = None) -> Result | None:
@@ -101,6 +116,7 @@ techmap; opt
 abc -g cmos2 -dff
 opt_clean
 stat
+ltp -noff
 """
     with tempfile.NamedTemporaryFile("w", suffix=".ys", delete=False) as f:
         f.write(script)
@@ -113,41 +129,22 @@ stat
 
     txt = r.stdout
     cells = area = 0
-    # yosys `stat` prints bare "<n> cells"; with no liberty there is no area,
-    # so use the DFF count as the sequential-cost proxy instead.
     m = re.search(r"^\s+(\d+)\s+cells\s*$", txt, re.M)
     if m:
         cells = int(m.group(1))
     area = float(sum(int(x) for x in re.findall(r"^\s+(\d+)\s+\$_DFF", txt, re.M)))
 
-    # Logic depth: a cheap proxy for the critical path without a liberty file.
-    depth = longest_path(unit, defines, srcs)
+    m_depth = re.search(r"Longest topological path in \S+ \(length=(\d+)\)", txt)
+    depth = int(m_depth.group(1)) if m_depth else -1
     return Result(unit, cells, area, depth, params)
 
-
-def longest_path(unit: str, defines: str, srcs: str) -> int:
-    """Combinational logic levels, via yosys `ltp` on the mapped netlist."""
-    script = f"""
-read_verilog -sv -I{RTL} {defines} {srcs}
-hierarchy -top {unit}
-proc; opt; flatten; opt; techmap; opt
-abc -g cmos2 -dff
-opt_clean
-ltp -noff
-"""
-    with tempfile.NamedTemporaryFile("w", suffix=".ys", delete=False) as f:
-        f.write(script)
-        path = f.name
-    r = subprocess.run(["yosys", "-s", path], capture_output=True, text=True)
-    m = re.search(r"Longest topological path in \S+ \(length=(\d+)\)", r.stdout)
-    return int(m.group(1)) if m else -1
 
 
 # Measurable on request, but not in the default sweep: even at SEGS=8 the
 # router takes many minutes under this flow's `abc -g cmos2 -dff` sequential
 # mapping, and `make p2` has to stay fast. Run it deliberately:
 #     python3 p2/ppa/loop.py --unit sonic_router
-SLOW = {"sonic_router"}
+SLOW = {"sonic_router", "sonic_tile"}
 
 
 def main() -> int:

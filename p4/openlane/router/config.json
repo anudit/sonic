@@ -1,22 +1,27 @@
 {
   "DESIGN_NAME": "sonic_router",
-  "VERILOG_FILES": ["dir::../../../p2/rtl/sonic_router.sv"],
-  "VERILOG_INCLUDE_DIRS": ["dir::../../../p2/rtl"],
-  "VERILOG_DEFINES": ["ROUTER_PWL_SEGS=64"],
-  "SYNTH_PARAMETERS": ["LANES=16"],
-
+  "VERILOG_FILES": [
+    "dir::../../../p2/rtl/sonic_router.sv"
+  ],
+  "VERILOG_INCLUDE_DIRS": [
+    "dir::../../../p2/rtl"
+  ],
+  "VERILOG_DEFINES": [
+    "ROUTER_PWL_SEGS=8"
+  ],
+  "SYNTH_PARAMETERS": [
+    "LANES=4"
+  ],
   "CLOCK_PORT": "clk",
-  "CLOCK_PERIOD": 10,
-
+  "CLOCK_PERIOD": 1500,
   "FP_CORE_UTIL": 40,
   "PL_TARGET_DENSITY_PCT": 45,
   "FP_ASPECT_RATIO": 1,
-
   "RUN_HEURISTIC_DIODE_INSERTION": true,
   "GRT_ALLOW_CONGESTION": true,
-
-  "// clock": "10 ns is deliberately slack. Sky130 at 130 nm cannot hit the 1 GHz S1 targets, and forcing it only produces buffer bloat that makes the layout less representative, not more.",
-  "// lanes": "LANES=16 rather than the shipping 64: same structure, quarter the multiplier array, tractable runtime. See p4/README.md.",
-  "// util": "40% utilisation leaves the router room. The top-k network is a wide combinational cone over a 1024-bit score register and is the congestion hot spot.",
+  "// clock": "1500 ns, raised from 10 ns after measurement: post-CTS repair_timing at 10 ns showed WNS -1086.6 ns on the top-k cone's sel[] path, i.e. an actual critical-path delay of roughly 1097 ns at Sky130. Buffer/gate resizing cannot close a gap that size (it fixes drive strength, not logic depth), so repair_timing was grinding ~0.14 ns/iteration with no realistic convergence. 1500 ns clears that path with margin so the resizer exits quickly and the flow can reach routing. Sky130 at 130 nm cannot hit the 1 GHz S1 targets regardless; this number exists to unblock P&R, not to model timing.",
+  "// lanes": "LANES=4 rather than the shipping 64: same structure, 1/16 the multiplier array, tractable runtime. See p4/README.md.",
+  "// segs": "ROUTER_PWL_SEGS=8 rather than the shipping 64: this is what actually fixed the ABC blowup, not LANES -- ABC ground for 2+ hours on the segment-select mux tree at SEGS=64 (single-threaded tech mapping) and cleared quickly once cut to 8. SEGS must stay a power of two (shift-based segment select in sonic_router.sv).",
+  "// util": "40% utilisation leaves the router room. The top-k network is a wide combinational cone over a 1024-bit score register and is the congestion hot spot -- and, per the clock note above, also the critical-path hot spot.",
   "// keys": "LibreLane errors on unrecognised config keys. Only keys beginning with // are exempt, which is why the comments look like this."
 }
