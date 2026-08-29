@@ -1,0 +1,41 @@
+{
+  "DESIGN_NAME": "sonic_top",
+  "VERILOG_FILES": [
+    "dir::../../../p2/rtl/sonic_acc.sv",
+    "dir::../../../p2/rtl/sonic_pe.sv",
+    "dir::../../../p2/rtl/sonic_tile.sv",
+    "dir::../../../p2/rtl/sonic_router.sv",
+    "dir::../../../p2/rtl/sonic_streamer.sv",
+    "dir::../../../p2/rtl/sonic_conv.sv",
+    "dir::../../../p2/rtl/sonic_softmax.sv",
+    "dir::../../../p2/rtl/sonic_lmhead.sv",
+    "dir::../../../p2/rtl/sonic_seq.sv",
+    "dir::../../../p2/rtl/sonic_vec.sv",
+    "dir::../../../p2/rtl/sonic_sram_bank.sv",
+    "dir::../../../p2/rtl/sonic_sram.sv",
+    "dir::../../../p2/rtl/sonic_rv32.sv",
+    "dir::../../../p2/rtl/sonic_noc.sv",
+    "dir::../../../p2/rtl/sonic_mbist.sv",
+    "dir::../../../p2/rtl/sonic_phy_lpddr5x.sv",
+    "dir::../../../p2/rtl/sonic_ioring.sv",
+    "dir::../../../p2/rtl/sonic_top.sv"
+  ],
+  "VERILOG_INCLUDE_DIRS": [
+    "dir::../../../p2/rtl"
+  ],
+  "VERILOG_DEFINES": [
+    "TILE=8"
+  ],
+  "// top": "This is a FLAT run at TILE=8 (1/8 shipping edge) attempted for curiosity/regression only. T4.2 in HANDOFF.md is explicit that the shipping chip (TILE=64, 4 sub-tiles, router, SRAM) will not go through a flat LibreLane run -- the router alone was 225k cells at 1/16 scale (LANES=4) and took 4h40m. The real path is hierarchical: harden tile, router, and sram_bank separately (their own config.json in this directory), then instance them as pre-placed macros in a top run via LibreLane's MACROS key, referencing each block's own LEF/GDS/lib outputs. That macro-based top config does not exist yet -- write it after the three block runs land, using their runs/*/final/{lef,gds,lib} paths.",
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 1000.0,
+  "FP_SIZING": "absolute",
+  "DIE_AREA": "0 0 4534 4534",
+  "CORE_AREA": "50 50 4484 4484",
+  "FP_CORE_UTIL": 65,
+  "PL_TARGET_DENSITY": 0.65,
+  "MACRO_PLACEMENT_CFG": "p4/openlane/top/macro_placement.cfg",
+  "DESIGN_IS_CORE": 1,
+  "FP_PDN_MULTILAYER": 1,
+  "CTS_TARGET_SKEW": 35
+}

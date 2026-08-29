@@ -1,0 +1,6 @@
+Subprocess had a non-zero exit.
+Last 2 line(s):
+Error parsing options: Option 'y' does not exist
+Run 'yosys --help' for help.
+
+Full log file: 'runs/RUN_2026-08-29_17-20-17/05-yosys-jsonheader/yosys-jsonheader.log'

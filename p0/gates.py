@@ -314,7 +314,7 @@ def wikitext2_text() -> str:
     try:
         from datasets import load_dataset
         return "\n\n".join(load_dataset(
-            "wikitext", "wikitext-2-raw-v1", split="test")["text"])
+            "Salesforce/wikitext", "wikitext-2-raw-v1", split="test")["text"])
     except ImportError:
         pass
     try:

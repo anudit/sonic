@@ -1,0 +1,17 @@
+{
+  "is_dense": false,
+  "unique_experts": [
+    3,
+    17,
+    19,
+    22
+  ],
+  "tokens": 1,
+  "d": 2048,
+  "experts": 32,
+  "top_k": 4,
+  "inter": 1792,
+  "bin": "layer_l5.bin",
+  "size_mb": 47.1,
+  "layer": 5
+}

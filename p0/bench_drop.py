@@ -27,42 +27,52 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sonic import quant
 from p0 import gates
 
-BENCH_TASKS = [
-    # ARC Challenge & Science
-    {"name": "arc_mineral", "prompt": "Question: Which property of a mineral can be determined by scratching it with a copper penny?\nChoices:\nA. luster\nB. hardness\nC. streak\nD. cleavage\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-    {"name": "arc_photosynthesis", "prompt": "Question: What is the primary pigment used by green plants to absorb sunlight during photosynthesis?\nChoices:\nA. Hemoglobin\nB. Chlorophyll\nC. Melanin\nD. Carotenoid\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-    {"name": "arc_gravity", "prompt": "Question: If an object is taken from the Earth to the Moon, how do its mass and weight change?\nChoices:\nA. Both mass and weight decrease\nB. Mass decreases, weight stays the same\nC. Mass stays the same, weight decreases\nD. Both mass and weight stay the same\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 2},
-    {"name": "arc_sound", "prompt": "Question: In which of the following media does sound travel the fastest?\nChoices:\nA. Air\nB. Water\nC. Steel\nD. Vacuum\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 2},
-    {"name": "arc_cells", "prompt": "Question: Which organelle is primarily responsible for ATP production through cellular respiration?\nChoices:\nA. Ribosome\nB. Mitochondrion\nC. Golgi apparatus\nD. Lysosome\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
+LETTERS = ["A", "B", "C", "D", "E"]
 
-    # MMLU Computer Science & Engineering
-    {"name": "mmlu_cla_adder", "prompt": "In digital logic design, what is the primary advantage of a carry-lookahead adder over a ripple-carry adder?\nChoices:\nA. It uses fewer logic gates\nB. It reduces propagation delay for carry computation\nC. It operates without a clock signal\nD. It consumes zero dynamic power\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-    {"name": "mmlu_dram_refresh", "prompt": "Why do DRAM cells require periodic refresh operations while SRAM cells do not?\nChoices:\nA. DRAM uses magnetic storage\nB. DRAM stores charge on leaky capacitors\nC. DRAM uses optical flip-flops\nD. DRAM is read-only\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-    {"name": "mmlu_cache_coherence", "prompt": "In shared-memory multicore architectures, which protocol ensures cache lines remain consistent across cores?\nChoices:\nA. MESI protocol\nB. TCP/IP protocol\nC. RSA protocol\nD. Round-robin protocol\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 0},
-    {"name": "mmlu_asymptotic", "prompt": "What is the average-case time complexity of standard quicksort with random pivot selection on an array of size n?\nChoices:\nA. O(n)\nB. O(n log n)\nC. O(n^2)\nD. O(log n)\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-    {"name": "mmlu_systolic", "prompt": "In a 2D systolic array for matrix multiplication, what flows across adjacent processing elements on each cycle?\nChoices:\nA. Instructions only\nB. Partial sums and activation/weight inputs\nC. Interrupt vectors\nD. DRAM row addresses\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
 
-    # Math & Quantitative Reasoning (GSM8K / Math)
-    {"name": "gsm_bakery", "prompt": "Janet sells 16 cookies for $2 each and 10 muffins for $3 each. How much money did Janet earn in total?\nChoices:\nA. $52\nB. $62\nC. $72\nD. $82\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-    {"name": "math_speed", "prompt": "A train travels at 60 miles per hour for 2.5 hours. How far does it travel?\nChoices:\nA. 120 miles\nB. 130 miles\nC. 150 miles\nD. 180 miles\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 2},
-    {"name": "math_prime", "prompt": "Which of the following numbers is a prime number?\nChoices:\nA. 21\nB. 27\nC. 29\nD. 35\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 2},
-    {"name": "math_geometry", "prompt": "What is the area of a right triangle with base 8 cm and height 5 cm?\nChoices:\nA. 13 cm^2\nB. 20 cm^2\nC. 40 cm^2\nD. 80 cm^2\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-    {"name": "math_probability", "prompt": "What is the probability of rolling a sum of 7 with two fair 6-sided dice?\nChoices:\nA. 1/12\nB. 1/6\nC. 1/4\nD. 7/36\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
+def _format_task(name: str, question: str, choice_texts: list[str], correct_idx: int) -> dict:
+    lines = [f"Question: {question}", "Choices:"]
+    for i, c in enumerate(choice_texts):
+        lines.append(f"{LETTERS[i]}. {c}")
+    lines.append("Answer:")
+    return {
+        "name": name,
+        "prompt": "\n".join(lines),
+        "choices": [f" {LETTERS[i]}" for i in range(len(choice_texts))],
+        "correct": correct_idx,
+    }
 
-    # HellaSwag & Common Sense Situational Reasoning
-    {"name": "hella_orchestra", "prompt": "A person is playing a cello on stage with an orchestra. The conductor raises their baton and\nChoices:\nA. the musician begins bowing the cello with precision\nB. jumps off the stage into the audience\nC. starts cooking a meal\nD. plays video games\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 0},
-    {"name": "hella_kitchen", "prompt": "A chef chops onions on a wooden board and then heats olive oil in a pan. Next, the chef\nChoices:\nA. throws the pan out the window\nB. slides the diced onions into the pan to saute them\nC. replaces the pan with a soccer ball\nD. turns off all lights and goes to sleep\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-    {"name": "hella_bicycle", "prompt": "A cyclist notices their front tire is completely flat before a race. To fix it, the cyclist\nChoices:\nA. puts salt on the pedals\nB. replaces or inflates the inner tube with a pump\nC. paints the handlebars blue\nD. rides backwards\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-    {"name": "hella_reading", "prompt": "A student sits at a library desk with an open textbook and a notebook. The student\nChoices:\nA. takes notes with a pen while studying the text\nB. tears all pages into confetti\nC. sings opera into a megaphone\nD. pours water on the computer keyboard\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 0},
-    {"name": "hella_gardening", "prompt": "A gardener digs a hole in the soil, places a young tomato plant inside, and\nChoices:\nA. sets the plant on fire\nB. fills the hole with dirt and waters it thoroughly\nC. covers the plant in concrete\nD. pulls the roots out\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
 
-    # Logic, Language & Humanities
-    {"name": "logic_syllogism", "prompt": "Premise 1: All humans are mortal.\nPremise 2: Socrates is human.\nConclusion:\nChoices:\nA. Socrates is immortal\nB. Socrates is mortal\nC. All mortals are Socrates\nD. No conclusion can be drawn\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-    {"name": "lang_antonym", "prompt": "What is the direct antonym of the word 'ephemeral'?\nChoices:\nA. Transient\nB. Permanent\nC. Fleeting\nD. Delicate\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-    {"name": "lang_capital", "prompt": "What is the capital city of Japan?\nChoices:\nA. Kyoto\nB. Osaka\nC. Tokyo\nD. Hiroshima\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 2},
-    {"name": "physics_newton", "prompt": "According to Newton's Second Law of Motion, force is equal to mass multiplied by what?\nChoices:\nA. Velocity\nB. Acceleration\nC. Energy\nD. Distance\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-    {"name": "chem_water", "prompt": "What is the chemical formula for water?\nChoices:\nA. CO2\nB. H2O\nC. NaCl\nD. CH4\nAnswer:", "choices": [" A", " B", " C", " D"], "correct": 1},
-]
+def load_real_tasks(n: int, seed: int = 0) -> list[dict]:
+    """n real multiple-choice items from ARC-Challenge (test) + MMLU (test),
+    split evenly, deterministically sampled. Replaces the 25 hand-written
+    questions HANDOFF.md flagged as statistically unusable (BF16 inside the
+    chance band at n=25) -- see T1.2."""
+    from datasets import load_dataset
+
+    rng = np.random.default_rng(seed)
+    n_arc = n // 2
+    n_mmlu = n - n_arc
+    tasks: list[dict] = []
+
+    arc = load_dataset("allenai/ai2_arc", "ARC-Challenge", split="test")
+    arc = arc.filter(lambda r: len(r["choices"]["text"]) == 4)
+    idx = rng.choice(len(arc), size=min(n_arc, len(arc)), replace=False)
+    for i in idx:
+        r = arc[int(i)]
+        try:
+            correct = r["choices"]["label"].index(r["answerKey"])
+        except ValueError:
+            continue
+        tasks.append(_format_task(f"arc_{r['id']}", r["question"], r["choices"]["text"], correct))
+
+    mmlu = load_dataset("cais/mmlu", "all", split="test")
+    idx = rng.choice(len(mmlu), size=min(n_mmlu, len(mmlu)), replace=False)
+    for i in idx:
+        r = mmlu[int(i)]
+        tasks.append(_format_task(f"mmlu_{r['subject']}_{int(i)}", r["question"], r["choices"], r["answer"]))
+
+    return tasks
 
 
 @torch.no_grad()
@@ -115,13 +125,13 @@ def wilson95(k: int, n: int) -> tuple[float, float]:
     return (100 * max(0.0, c - h), 100 * min(1.0, c + h))
 
 
-def run_benchmark_suite(model, tok, device: str,
+def run_benchmark_suite(model, tok, device: str, tasks: list[dict],
                         chat: bool = False) -> tuple[float, int, int]:
     """Returns (accuracy %, correct, n) over the benchmark tasks."""
     correct = 0
-    for task in BENCH_TASKS:
+    for task in tasks:
         correct += evaluate_task(model, tok, task, device, chat)
-    n = len(BENCH_TASKS)
+    n = len(tasks)
     return (correct / n) * 100.0, correct, n
 
 
@@ -135,9 +145,17 @@ def main() -> int:
                     help="score through the model's chat template (see "
                          "evaluate_task); the instruct model answers at chance "
                          "without it, which makes any drop unmeasurable")
+    ap.add_argument("--n-tasks", type=int, default=200,
+                    help="real ARC-Challenge + MMLU items, split evenly (T1.2: "
+                         "n=25 hand-written questions was statistically unusable)")
+    ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args()
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    print(f"Sampling {a.n_tasks} real items from ARC-Challenge + MMLU (seed={a.seed})...", flush=True)
+    tasks = load_real_tasks(a.n_tasks, seed=a.seed)
+    print(f"  {len(tasks)} tasks loaded")
 
     print(f"Loading {a.model} on {a.device} for downstream benchmark suite...", flush=True)
     tok = AutoTokenizer.from_pretrained(a.model)
@@ -146,7 +164,7 @@ def main() -> int:
 
     print("\n--- Evaluating BF16 baseline accuracy ---")
     t0 = time.time()
-    bf16_acc, bf16_k, n = run_benchmark_suite(model, tok, a.device, a.chat)
+    bf16_acc, bf16_k, n = run_benchmark_suite(model, tok, a.device, tasks, a.chat)
     bf16_ci = wilson95(bf16_k, n)
     print(f"  BF16 accuracy: {bf16_acc:.1f}%  95% CI [{bf16_ci[0]:.1f}, "
           f"{bf16_ci[1]:.1f}]  ({bf16_k}/{n}, {time.time()-t0:.1f}s)")
@@ -157,7 +175,7 @@ def main() -> int:
 
     print("\n--- Evaluating quantized model accuracy ---")
     t1 = time.time()
-    quant_acc, quant_k, _ = run_benchmark_suite(model, tok, a.device, a.chat)
+    quant_acc, quant_k, _ = run_benchmark_suite(model, tok, a.device, tasks, a.chat)
     quant_ci = wilson95(quant_k, n)
     print(f"  Quantized accuracy: {quant_acc:.1f}%  95% CI [{quant_ci[0]:.1f}, "
           f"{quant_ci[1]:.1f}]  ({quant_k}/{n}, {time.time()-t1:.1f}s)")

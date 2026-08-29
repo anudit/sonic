@@ -1,0 +1,15 @@
+{
+  "prompt_tokens": 2048,
+  "chunk_size": 512,
+  "n_chunks": 4,
+  "n_layers": 24,
+  "moe_layers": 22,
+  "total_passes": 185708544,
+  "useful_macs": 2164663517184,
+  "total_mac_capacity": 3042648784896,
+  "occupancy": 0.7114,
+  "dram_mb_streamed": 15136.4,
+  "dram_mb_unbuffered": 1126604.8,
+  "bandwidth_reduction_factor": 74.43,
+  "ttft_ms": 216.4
+}

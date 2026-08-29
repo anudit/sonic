@@ -1,4 +1,4 @@
-.PHONY: demo-data p3-top p3-layer p3-generate p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-router-ci p4-pull vectors iv wave numbers clean
+.PHONY: demo-data p3-top p3-layer p3-generate p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-tile p4-sram p4-router-ci p4-pull vectors iv wave numbers clean
 
 # Homebrew's binutils shadows Apple's ar with GNU ar, whose archives macOS ld
 # rejects. Verilator links fail without this.
@@ -8,6 +8,7 @@ VROOT  := $(shell verilator --getenv VERILATOR_ROOT 2>/dev/null)
 all: test numbers
 
 test: golden
+	@.venv/bin/python p2/lint_defs.py
 	@cd tests && python3 run.py
 
 golden:
@@ -78,7 +79,7 @@ p2-units: build/sonic_golden.o
 	  p2/rtl/sonic_seq.sv p2/tb/tb_seq.cpp >/dev/null 2>&1
 	@$(MAKE) -C build/obj_seq -f Vsonic_seq.mk $(AR_FIX) -j8 >/dev/null 2>&1
 	@printf "  sonic_seq      "; ./build/obj_seq/Vsonic_seq | tail -1
-	@for u in tile lmhead; do \
+	@for u in tile lmhead rv32; do \
 	  rm -rf build/obj_$$u; \
 	  verilator --cc --exe -O2 -Wall -Wno-DECLFILENAME -Ip2/rtl \
 	    --Mdir build/obj_$$u --top-module sonic_$$u \
@@ -152,6 +153,14 @@ p4-router:
 	@cd p4/openlane/router && nix run github:librelane/librelane -- config.json
 	@echo "opening the routed layout in KLayout"
 	@open -a KLayout $$(ls -td p4/openlane/router/runs/*/final/gds/*.gds | head -1)
+
+p4-tile:
+	@command -v nix >/dev/null || { echo "Nix not installed -- see p4/README.md"; exit 1; }
+	@cd p4/openlane/tile && nix run github:librelane/librelane -- config.json
+
+p4-sram:
+	@command -v nix >/dev/null || { echo "Nix not installed -- see p4/README.md"; exit 1; }
+	@cd p4/openlane/sram && nix run github:librelane/librelane -- config.json
 
 # CI path: no Nix on this machine. Runs on an x86-64 Linux runner, which is
 # where OpenROAD actually has support. LANES/PWL override the config defaults.
@@ -254,14 +263,20 @@ p3-ring:
 	@python3 p3/producer.py
 	@$(MAKE) p2-units
 
-p3-top: p2/vectors/layer_l5.bin build/sonic_golden.o
+p2/vectors/multi/manifest.json:
+	@.venv/bin/python p3/export_multi_layer.py --layers 5 6 7 8 --tokens 1
+
+p3-top: p2/vectors/layer_l5.bin p2/vectors/multi/manifest.json build/sonic_golden.o
 	@rm -rf build/obj_top
 	@verilator --cc --exe -O2 -Wno-fatal -Ip2/rtl \
 	  -CFLAGS "-I$(CURDIR)/p0/golden -O2" --Mdir build/obj_top \
 	  --top-module sonic_top p2/rtl/sonic_acc.sv p2/rtl/sonic_pe.sv \
 	  p2/rtl/sonic_conv.sv p2/rtl/sonic_softmax.sv p2/rtl/sonic_lmhead.sv \
 	  p2/rtl/sonic_streamer.sv p2/rtl/sonic_router.sv p2/rtl/sonic_tile.sv \
-	  p2/rtl/sonic_seq.sv p2/rtl/sonic_top.sv p2/tb/tb_top.cpp $(CURDIR)/build/sonic_golden.o >/dev/null 2>&1
+	  p2/rtl/sonic_seq.sv p2/rtl/sonic_vec.sv p2/rtl/sonic_sram_bank.sv \
+	  p2/rtl/sonic_sram.sv p2/rtl/sonic_rv32.sv p2/rtl/sonic_noc.sv \
+	  p2/rtl/sonic_mbist.sv p2/rtl/sonic_phy_lpddr5x.sv p2/rtl/sonic_ioring.sv \
+	  p2/rtl/sonic_top.sv p2/tb/tb_top.cpp $(CURDIR)/build/sonic_golden.o >/dev/null 2>&1
 	@$(MAKE) -C build/obj_top -f Vsonic_top.mk $(AR_FIX) -j8 >/dev/null 2>&1
 	@./build/obj_top/Vsonic_top p2/vectors/layer_l5.bin
 

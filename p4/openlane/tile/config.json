@@ -1,0 +1,30 @@
+{
+  "DESIGN_NAME": "sonic_tile",
+  "VERILOG_FILES": [
+    "dir::../../../p2/rtl/sonic_acc.sv",
+    "dir::../../../p2/rtl/sonic_pe.sv",
+    "dir::../../../p2/rtl/sonic_tile.sv"
+  ],
+  "VERILOG_INCLUDE_DIRS": [
+    "dir::../../../p2/rtl"
+  ],
+  "VERILOG_DEFINES": [
+    "TILE=8"
+  ],
+  "// tile": "TILE=8 rather than the shipping 64: same reasoning as the router's LANES=4 -- same structure, 1/8 the array edge, tractable ABC runtime for a first real Sky130 run. See T4.1/T4.3 in HANDOFF.md.",
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 1000.0,
+  "CLOCK_NET": "clk",
+  "FP_SIZING": "absolute",
+  "DIE_AREA": "0 0 1200 1200",
+  "CORE_AREA": "10 10 1190 1190",
+  "FP_CORE_UTIL": 65,
+  "PL_TARGET_DENSITY": 0.68,
+  "SYNTH_STRATEGY": "AREA 0",
+  "SYNTH_BUFFERING": 1,
+  "SYNTH_SIZING": 1,
+  "CTS_TARGET_SKEW": 30,
+  "GLB_RT_MAX_DIODE_INS_ITERS": 5,
+  "DESIGN_IS_CORE": 0,
+  "FP_PDN_MULTILAYER": 1
+}

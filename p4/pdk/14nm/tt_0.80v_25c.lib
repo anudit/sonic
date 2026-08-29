@@ -1,0 +1,82 @@
+/* 14nm FinFET Standard Cell Liberty Timing Model: tt_0.80v_25c.lib
+ * Typical-Typical Corner: VDD = 0.80V, T = 25C
+ * Target Frequency: 1.0 GHz (T_clk = 1.000 ns, 1000 ps)
+ */
+
+library (sonic_14nm_tt) {
+  technology (cmos);
+  delay_model : table_lookup;
+  time_unit : "1ps";
+  voltage_unit : "1V";
+  current_unit : "1mA";
+  pulling_resistance_unit : "1kohm";
+  capacitive_load_unit (1, pf);
+
+  nom_process : 1.0;
+  nom_temperature : 25.0;
+  nom_voltage : 0.80;
+
+  default_max_transition : 80;
+  default_fanout_load : 1.0;
+  default_inout_pin_cap : 0.002;
+  default_input_pin_cap : 0.002;
+  default_output_pin_cap : 0.000;
+
+  /* Standard 14nm FinFET Gate Delays (in picoseconds) */
+  /* Inverter (INV_X1): ~8 ps */
+  /* 2-input NAND (NAND2_X1): ~11 ps */
+  /* 2-input NOR (NOR2_X1): ~14 ps */
+  /* 2-input XOR (XOR2_X1): ~18 ps */
+  /* 28nm/14nm Full Adder (FA_X1): ~32 ps */
+  /* D-Flip-Flop (DFF_X1): T_clk_q = 28 ps, T_setup = 22 ps, T_hold = 8 ps */
+
+  cell (DFF_X1) {
+    area : 1.84;
+    pin (CLK) { direction : input; clock : true; }
+    pin (D)   { direction : input; }
+    pin (Q)   {
+      direction : output;
+      timing () {
+        related_pin : "CLK";
+        timing_type : rising_edge;
+        cell_rise (scalar) { values ("28.0"); }
+        cell_fall (scalar) { values ("28.0"); }
+      }
+    }
+  }
+
+  cell (NAND2_X1) {
+    area : 0.92;
+    pin (A) { direction : input; }
+    pin (B) { direction : input; }
+    pin (Y) {
+      direction : output;
+      function : "!(A & B)";
+      timing () {
+        cell_rise (scalar) { values ("11.2"); }
+        cell_fall (scalar) { values ("10.8"); }
+      }
+    }
+  }
+
+  cell (FA_X1) {
+    area : 3.68;
+    pin (A) { direction : input; }
+    pin (B) { direction : input; }
+    pin (CI){ direction : input; }
+    pin (S) {
+      direction : output;
+      timing () {
+        cell_rise (scalar) { values ("31.5"); }
+        cell_fall (scalar) { values ("30.8"); }
+      }
+    }
+    pin (CO) {
+      direction : output;
+      timing () {
+        cell_rise (scalar) { values ("24.2"); }
+        cell_fall (scalar) { values ("23.6"); }
+      }
+    }
+  }
+}

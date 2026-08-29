@@ -1,0 +1,21 @@
+{
+  "DESIGN_NAME": "sonic_sram_bank",
+  "VERILOG_FILES": [
+    "dir::../../../p2/rtl/sonic_sram_bank.sv"
+  ],
+  "VERILOG_INCLUDE_DIRS": [
+    "dir::../../../p2/rtl"
+  ],
+  "SYNTH_PARAMETERS": [
+    "ADDR_WIDTH=8"
+  ],
+  "// sram": "ADDR_WIDTH=8 (256 words) rather than the shipping 17 (128K words / 512 KB): every array in this design is flops today (T3.3/P2-12, not yet hard macros), so a full-depth bank is ~4M flops and not tractable through ABC. This is a flow-qualification run at reduced depth, same as LANES=4 for the router and TILE=8 for the tile -- see p4/RESULTS.md and HANDOFF.md T3.3 for the real fix (OpenRAM hard macros via LibreLane's MACROS key), which this run does not attempt.",
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 1000.0,
+  "FP_SIZING": "absolute",
+  "DIE_AREA": "0 0 600 650",
+  "CORE_AREA": "10 10 590 640",
+  "PL_TARGET_DENSITY": 0.72,
+  "DESIGN_IS_CORE": 0,
+  "// keys": "LibreLane errors on unrecognised config keys. Only keys beginning with // are exempt."
+}

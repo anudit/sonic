@@ -1,0 +1,74 @@
+{
+  "model": "LiquidAI/LFM2.5-8B-A1B",
+  "layers": [
+    {
+      "is_dense": false,
+      "unique_experts": [
+        3,
+        17,
+        19,
+        22
+      ],
+      "tokens": 1,
+      "d": 2048,
+      "experts": 32,
+      "top_k": 4,
+      "inter": 1792,
+      "bin": "layer_l5.bin",
+      "size_mb": 47.1,
+      "layer": 5
+    },
+    {
+      "is_dense": false,
+      "unique_experts": [
+        11,
+        14,
+        19,
+        26
+      ],
+      "tokens": 1,
+      "d": 2048,
+      "experts": 32,
+      "top_k": 4,
+      "inter": 1792,
+      "bin": "layer_l6.bin",
+      "size_mb": 47.1,
+      "layer": 6
+    },
+    {
+      "is_dense": false,
+      "unique_experts": [
+        3,
+        5,
+        12,
+        22
+      ],
+      "tokens": 1,
+      "d": 2048,
+      "experts": 32,
+      "top_k": 4,
+      "inter": 1792,
+      "bin": "layer_l7.bin",
+      "size_mb": 47.1,
+      "layer": 7
+    },
+    {
+      "is_dense": false,
+      "unique_experts": [
+        0,
+        1,
+        11,
+        30
+      ],
+      "tokens": 1,
+      "d": 2048,
+      "experts": 32,
+      "top_k": 4,
+      "inter": 1792,
+      "bin": "layer_l8.bin",
+      "size_mb": 47.1,
+      "layer": 8
+    }
+  ],
+  "note": "each layer's x is the model's real residual-stream input at that depth, from one shared forward pass -- so layer[i+1].x is genuinely downstream of layer[i].y, not re-synthesized."
+}

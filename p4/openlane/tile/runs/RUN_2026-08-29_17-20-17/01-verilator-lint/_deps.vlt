@@ -1,0 +1,5 @@
+`verilator_config
+lint_off -rule DECLFILENAME
+lint_off -rule EOFNEWLINE
+lint_off -rule UNDRIVEN -file "/Users/anudit/Documents/GitHub/sonic/p4/openlane/tile/runs/RUN_2026-08-29_17-20-17/tmp/38ac9d1bcfc54ae2b540a32991ff6e0d.bb.v"
+lint_off -rule UNUSEDSIGNAL -file "/Users/anudit/Documents/GitHub/sonic/p4/openlane/tile/runs/RUN_2026-08-29_17-20-17/tmp/38ac9d1bcfc54ae2b540a32991ff6e0d.bb.v"
