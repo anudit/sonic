@@ -48,34 +48,61 @@ def build() -> dict:
                     for k, v in BLOCK_FMT.items()}
     out["gates"] = GATES
 
-    # Incorporate real physical design and hardware signoff measurements
+    # Incorporate real physical design and hardware signoff measurements only
+    # -- no invented STA/ATPG/IR-drop numbers. See HANDOFF.md and JOURNEY.md
+    # ("a report that described work that hadn't happened") for why this
+    # section was rewritten: it used to read p4/sta/sta_report.json,
+    # p4/dft/atpg_report.json, p4/power/ir_drop_report.json, all of which
+    # were computed from hardcoded literals with no real tool behind them.
+    # Those files and the scripts that wrote them have been deleted/rewritten;
+    # this only reports what real LibreLane/OpenROAD runs actually measured.
     verif: dict = {
-        "top_cosine_sim": 0.99119,
-        "top_regression": "PASSED (6/6 stages)",
-        "sta_target_ghz": 1.0,
-        "sta_status": "PASSED (Worst SS Slack >= 0 ps)"
+        "top_single_layer_cosine": 0.99119,
+        "top_single_layer_status": "PASSED (>=0.99 gate)",
+        # Real per-layer result from `make p3-top` Test 3 (4 distinct real
+        # MoE layers, p3/export_multi_layer.py) -- NOT all passing. This is
+        # the honest number after the previous fake test (which printed the
+        # single-layer cosine 4 times) was fixed and found a real gate miss.
+        "top_multilayer_layers": [5, 6, 7, 8],
+        "top_multilayer_cosine": [0.99119, 0.98993, 0.99086, 0.98689],
+        "top_multilayer_status": "2/4 layers PASS >=0.99 gate (l6, l8 FAIL) -- open, not yet root-caused",
     }
 
-    sta_file = ROOT / "p4/sta/sta_report.json"
-    if sta_file.exists():
+    blocks_real = {}
+    for name, path in (
+        ("sonic_router", ROOT / "p4/openlane/router/results/segs8/metrics.json"),
+        ("sonic_tile", ROOT / "p4/openlane/tile/results/tile8/metrics.json"),
+        ("sonic_sram_bank", ROOT / "p4/openlane/sram/results/sram8/metrics.json"),
+    ):
+        if not path.exists():
+            continue
         try:
-            verif["sta"] = json.loads(sta_file.read_text())
+            m = json.loads(path.read_text())
         except Exception:
-            pass
-
-    atpg_file = ROOT / "p4/dft/atpg_report.json"
-    if atpg_file.exists():
-        try:
-            verif["atpg"] = json.loads(atpg_file.read_text())
-        except Exception:
-            pass
-
-    ir_file = ROOT / "p4/power/ir_drop_report.json"
-    if ir_file.exists():
-        try:
-            verif["ir_drop"] = json.loads(ir_file.read_text())
-        except Exception:
-            pass
+            continue
+        blocks_real[name] = dict(
+            wns_ps=m.get("timing__setup__wns"),
+            tns_ps=m.get("timing__setup__tns"),
+            slew_violations=m.get("design__max_slew_violation__count"),
+            fanout_violations=m.get("design__max_fanout_violation__count"),
+            cap_violations=m.get("design__max_cap_violation__count"),
+            utilization=m.get("design__instance__utilization"),
+            std_cells=m.get("design__instance__count__stdcell"),
+            power_w=m.get("power__total"),
+            # Real OpenROAD PDN static-drop check, where present (sram run
+            # has it; router/tile runs predate/omit it). This is a per-net
+            # static check on THIS reduced-scale block, not the full-chip
+            # dynamic prefill-burst scenario p4/power/ir_drop.py models --
+            # label it as such wherever quoted.
+            pdn_drop_worst_v=m.get("design_powergrid__drop__worst"),
+        )
+    if blocks_real:
+        verif["sky130_real"] = blocks_real
+        verif["sky130_note"] = ("Real LibreLane/OpenROAD Sky130 results at reduced scale "
+                                 "(LANES=4 router, TILE=8 tile, ADDR_WIDTH=8 sram) -- Sky130 "
+                                 "is a real 130nm node, not 14nm, and these are flow-"
+                                 "qualification runs, not shipping-scale signoff. See "
+                                 "p4/sta/sta_check.py --metrics for the full per-corner data.")
 
     pf_file = ROOT / "p3/out/prefill_schedule.json"
     if pf_file.exists():
@@ -83,6 +110,23 @@ def build() -> dict:
             verif["prefill_schedule"] = json.loads(pf_file.read_text())
         except Exception:
             pass
+
+    # Real rendered GDS images (KLayout, real Sky130 layer colors), embedded
+    # as data URIs so the page stays a single self-contained file.
+    renders: dict = {}
+    render_dir = Path(__file__).parent / "render"
+    for name, path in (
+        ("tile_overview", render_dir / "sonic_tile.png"),
+        ("tile_wires", render_dir / "sonic_tile_crop.png"),
+        ("router_overview", ROOT / "p4/openlane/router/results/segs8/sonic_router.jpg"),
+        ("sram_overview", render_dir / "sonic_sram.png"),
+        ("sram_wires", render_dir / "sonic_sram_crop.png"),
+    ):
+        if path.exists():
+            import base64
+            mime = "image/png" if path.suffix == ".png" else "image/jpeg"
+            renders[name] = f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
+    out["renders"] = renders
 
     out["verification"] = verif
     return out

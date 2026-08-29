@@ -21,7 +21,7 @@ sweep units.
 | P1 Architecture and package | ~90% | P1-1 sweep now cross-checked against real routing counts (`p0/out/real_routing.npz`), not just a synthetic imbalance model — see caveat below (real check is at the captured chunk size, 732 tok, not the shipping 2048). |
 | P2 Unit RTL and PPA loop | ~99% | 11/11 benched (added `sonic_rv32`, `sonic_vec`, both real cores with real differential tests), P2-13 lint enforced in `make test`. Only P2-12 (SRAM hard macros) and the LANES=64 router depth reconciliation remain, both needing real EDA tooling not present on this machine. |
 | P3 Integration | ~70% | multi-layer test is now real (4 distinct layers, not a repeated number) and **found layers 6/8 fail the cosine gate** — open, not yet root-caused. NoC and RV32 core exist and pass unit-level differential tests but aren't yet driven end-to-end through `sonic_top`. |
-| P4 Physical design | ~30% | fabricated STA/ATPG/IR-drop numbers replaced with honest "no measurement" reporting; configs for tile/sram fixed and ready; real P&R runs for tile/sram handed to the x86/Nix box (no OpenROAD available here). |
+| P4 Physical design | ~45% | fabricated STA/ATPG/IR-drop numbers replaced with honest reporting; **`sonic_tile` (TILE=8) and `sonic_sram_bank` (ADDR_WIDTH=8) both now have real Sky130 P&R results** — WNS/TNS=0 at 1000ns for both, but real slew/fanout/cap violations (tile 7,638/96/48; sram 7,535/148/42) and a real OpenROAD PDN static-drop measurement on the sram run. Both rendered to real routed-metal images in `demo/floorplan.html`. Router re-run (config-next.json, LANES=4/SEGS=32) still queued on the x86/Nix box. |
 | P5 Tapeout | 0% | not started |
 
 ### P0 — Numerics and routing freeze

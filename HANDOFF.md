@@ -332,6 +332,57 @@ is a descriptor ring, not a core.
 timing-critical block and now the only large one whose depth is understood.
 - *Accept:* completes; reports what the clock needs at `TILE=8` and `TILE=16`;
   answers whether the flow scales past 225 k cells.
+- **[x] Done at TILE=8**, real LibreLane run on Sky130
+  (`p4/openlane/tile/results/tile8/metrics.json`, run
+  `RUN_2026-08-29_13-05-07`, 80/80 steps, `final/` present). First attempt
+  at DIE 600×650 failed global placement at 108% utilization (GPL-0301);
+  fixed by enlarging to 700×700; that got past placement but failed
+  *detailed* placement post-CTS (DPL-0036) because 80% initial utilization
+  left no room for the hold/fanout resizer's inserted buffers to legalize
+  into — the same lesson the router's own config already encoded
+  (`"40% utilisation leaves the router room"`) and that hadn't been applied
+  here yet. Fixed by matching the router's margin: 1000×1000 die,
+  `PL_TARGET_DENSITY=0.45`.
+
+  Result at `CLOCK_PERIOD=1000` (1 MHz, generous — chosen to unblock the
+  flow, not to model a target frequency, same posture as the router's early
+  runs): **WNS/TNS = 0 across all Sky130 corners (tt/ss/ff)** — the design
+  meets that clock with margin. But exactly the router's pattern repeats:
+  the clean timing headline hides real electrical-limit violations —
+  **7,638 max-slew, 96 max-fanout, 48 max-cap** violations (worst corner
+  across all named). 51,199 std cells, 25.4% utilization, 0.0042 W total
+  power at this reduced TILE=8 scale (not shipping-scale, not 14nm — Sky130
+  generic power at 1/8 array edge). `p4/sta/sta_check.py --metrics
+  p4/openlane/tile/results/tile8/metrics.json` reports all of this; T4.1's
+  "answers whether the flow scales past 225k cells" is not yet answered —
+  this run has 51,199 std cells (+ fill/tap), well under the router's 225k,
+  so scaling toward `TILE=16`/`TILE=64` is still open.
+
+- **[x] A third block done: `sonic_sram_bank` at ADDR_WIDTH=8** (real
+  LibreLane run, run `RUN_2026-08-29_15-10-28`, `final/` present, copied to
+  `p4/openlane/sram/results/sram8/metrics.json`). Also took two real
+  failures to land: DIE 600×650 failed global placement at 108% utilization
+  (GPL-0301, same class of mistake as the tile run above — floorplan sized
+  before the real cell count was known); DIE 700×700 at 0.72 target density
+  passed global placement but failed detailed placement post-CTS (DPL-0036),
+  again from insufficient headroom for the resizer's buffer insertion. Fixed
+  by matching the router's own margin: 1000×1000 die, `PL_TARGET_DENSITY=0.45`.
+
+  Result at `CLOCK_PERIOD=1000`: **WNS/TNS = 0**, same clean-headline
+  pattern, same real violations underneath — **7,535 max-slew, 148
+  max-fanout, 42 max-cap**. 49,514 std cells (8,224 of them sequential —
+  consistent with a 256-word × 32-bit register array plus control), 52.0%
+  utilization, 0.86 mW. This run's `metrics.json` also carries a real
+  OpenROAD PDN static-drop check (`design_powergrid__drop__worst`) — a
+  genuine measured value, but a per-net static check on this reduced-scale
+  block under whatever stimulus OpenROAD's default PDN analysis assumes, NOT
+  the full-chip dynamic prefill-burst scenario `p4/power/ir_drop.py` models.
+  Label it as such if it's ever quoted; it does not answer T4.6.
+
+  Both the tile and sram real GDS were rendered (KLayout, real Sky130 layer
+  colors, fill/tap cells hidden) into real routed-metal close-ups and full-die
+  images now embedded in `demo/floorplan.html`'s "Real Silicon" section —
+  see `p4/render_gds.py` / `p4/render_gds_crop.py`.
 
 **T4.2 — Hierarchical P&R.** A 16,384-MAC chip will not go through a flat
 LibreLane run — the router alone was 225 k cells and 4 h 40 min. Tile hardened

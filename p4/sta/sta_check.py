@@ -105,11 +105,29 @@ def main() -> int:
             print(f"  MISSING: {extra}")
             continue
         m = json.loads(extra.read_text())
-        keys = {k: v for k, v in m.items()
-                if any(s in k.lower() for s in ("slack", "period", "wns", "tns"))}
+        timing = {k: v for k, v in m.items()
+                  if any(s in k.lower() for s in ("slack", "period", "wns", "tns"))}
         print(f"\n  {extra}:")
-        for k, v in keys.items():
+        for k, v in timing.items():
             print(f"    {k}: {v}")
+
+        # A clean WNS/TNS headline can hide real electrical-limit violations
+        # (this is exactly what happened with the router -- see p4/RESULTS.md
+        # and HANDOFF.md T2.3). Surface them every time, not just on request.
+        viol = {k: v for k, v in m.items()
+                if "violation__count" in k and not k.startswith("design__power_grid")}
+        total_viol = {k: v for k, v in viol.items() if "__corner:" not in k}
+        if total_viol:
+            print(f"    -- electrical-limit violations (worst corner across all named) --")
+            for k, v in sorted(total_viol.items()):
+                print(f"    {k}: {v}")
+        util = m.get("design__instance__utilization")
+        power = m.get("power__total")
+        if util is not None:
+            print(f"    design__instance__utilization: {util}")
+        if power is not None:
+            print(f"    power__total: {power} W (this block, this scale/corner -- "
+                  f"not a full-chip or shipping-scale number)")
 
     print("\n-- Real Yosys/ABC logic depth, generic library, NO frequency claim --")
     print(f"  {'unit':<16} {'depth':>6} {'cells':>10} {'params'}")

@@ -1,9 +1,0 @@
-{
-  "status": "NO_REAL_ATPG_RUN",
-  "reason": "no ATPG tool available on this machine; see docstring",
-  "scan_chains": 16,
-  "known_dffs_by_unit": {
-    "sonic_tile": 2568
-  },
-  "total_known_dffs": 2568
-}
