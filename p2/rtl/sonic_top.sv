@@ -389,6 +389,20 @@ module sonic_top #(
   logic                      mbist_we_w;
   logic [SRAM_AW-1:0]        mbist_addr_w;
   logic [31:0]               mbist_wdata_w;
+  logic [N_SRAM_BANKS-1:0]   sram_bank_sleep;
+
+  // Only the banks the current chunk/decode step actually addresses stay
+  // awake; a bank idle for 2**IDLE_BITS cycles drops into retention sleep.
+  // See sonic_sram_gate.sv for the same-cycle-access safety property.
+  sonic_sram_gate #(
+    .N_BANKS(N_SRAM_BANKS),
+    .IDLE_BITS(8)
+  ) u_sram_gate (
+    .clk(clk),
+    .rst_n(rst_n),
+    .bank_ce(sram_ce),
+    .bank_sleep(sram_bank_sleep)
+  );
 
   sonic_sram #(
     .N_BANKS(N_SRAM_BANKS),
@@ -403,7 +417,7 @@ module sonic_top #(
     .bank_wdata(sram_wdata),
     .bank_wmask(sram_wmask),
     .bank_rdata(sram_rdata),
-    .bank_sleep('0),
+    .bank_sleep(sram_bank_sleep),
     .bist_en(mbist_en_w),
     .bist_we(mbist_we_w),
     .bist_addr(mbist_addr_w),

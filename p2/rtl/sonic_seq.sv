@@ -61,11 +61,24 @@ module sonic_seq #(
   // are just the wrong ones, and the fetch they issue is a correct fetch of the
   // wrong tensor. It is the exact failure class the streamer bench pinned a
   // contract for one block over: right data, wrong cycle.
-  logic [DW-1:0] raw, patched;
-  assign raw     = ring[pc];
-  assign patched = (raw[DW-1:DW-4] == OP_EXPERT)
-                 ? {raw[DW-1:`EXPERT_BITS], patch_q}
-                 : raw;
+  //
+  // The ring read is a registered `mem[addr]` with the address computed one
+  // cycle ahead (`pc_next`, mirroring the FSM's own next-pc logic below) --
+  // not a combinational `ring[pc]` -- so synthesis sees a single-port
+  // synchronous-read memory it can map to an SRAM macro, instead of a huge
+  // per-word read mux sitting in front of a flip-flop array. `pc_next` at
+  // cycle T equals `pc` at cycle T+1, so `raw_q` lands on the same cycle the
+  // old combinational `raw` would have -- this is a synthesis-mapping change
+  // only, not a timing change.
+  logic [$clog2(DEPTH)-1:0] pc_next;
+  assign pc_next = (start && len != '0) ? '0 : (busy ? pc + 1'b1 : pc);
+
+  logic [DW-1:0] raw_q, patched;
+  always_ff @(posedge clk) raw_q <= ring[pc_next];
+
+  assign patched = (raw_q[DW-1:DW-4] == OP_EXPERT)
+                 ? {raw_q[DW-1:`EXPERT_BITS], patch_q}
+                 : raw_q;
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin

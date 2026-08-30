@@ -12,6 +12,7 @@
     "dir::../../../p2/rtl/sonic_seq.sv",
     "dir::../../../p2/rtl/sonic_vec.sv",
     "dir::../../../p2/rtl/sonic_sram_bank.sv",
+    "dir::../../../p2/rtl/sonic_sram_gate.sv",
     "dir::../../../p2/rtl/sonic_sram.sv",
     "dir::../../../p2/rtl/sonic_rv32.sv",
     "dir::../../../p2/rtl/sonic_noc.sv",
@@ -23,19 +24,36 @@
   "VERILOG_INCLUDE_DIRS": [
     "dir::../../../p2/rtl"
   ],
-  "VERILOG_DEFINES": [
-    "TILE=8"
+  "SYNTH_PARAMETERS": [
+    "T=8",
+    "N_TILES=1",
+    "ROUTER_LANES=4",
+    "ROUTER_PWL_SEGS=8",
+    "ROUTER_PWL_RANGE=4",
+    "CONV_CH=4",
+    "LMHEAD_K=4",
+    "SEQ_DEPTH=32",
+    "N_SRAM_BANKS=1",
+    "SRAM_AW=6"
   ],
-  "// top": "This is a FLAT run at TILE=8 (1/8 shipping edge) attempted for curiosity/regression only. T4.2 in HANDOFF.md is explicit that the shipping chip (TILE=64, 4 sub-tiles, router, SRAM) will not go through a flat LibreLane run -- the router alone was 225k cells at 1/16 scale (LANES=4) and took 4h40m. The real path is hierarchical: harden tile, router, and sram_bank separately (their own config.json in this directory), then instance them as pre-placed macros in a top run via LibreLane's MACROS key, referencing each block's own LEF/GDS/lib outputs. That macro-based top config does not exist yet -- write it after the three block runs land, using their runs/*/final/{lef,gds,lib} paths.",
   "CLOCK_PORT": "clk",
-  "CLOCK_PERIOD": 1000.0,
-  "FP_SIZING": "absolute",
-  "DIE_AREA": "0 0 4534 4534",
-  "CORE_AREA": "50 50 4484 4484",
-  "FP_CORE_UTIL": 65,
-  "PL_TARGET_DENSITY": 0.65,
-  "MACRO_PLACEMENT_CFG": "p4/openlane/top/macro_placement.cfg",
+  "CLOCK_PERIOD": 1500,
+  "FP_CORE_UTIL": 35,
+  "PL_TARGET_DENSITY_PCT": 40,
+  "FP_ASPECT_RATIO": 1,
+  "RUN_HEURISTIC_DIODE_INSERTION": true,
+  "GRT_ALLOW_CONGESTION": true,
+  "SYNTH_STRATEGY": "AREA 0",
+  "SYNTH_BUFFERING": 1,
+  "SYNTH_SIZING": 1,
+  "GLB_RT_MAX_DIODE_INS_ITERS": 5,
   "DESIGN_IS_CORE": 1,
   "FP_PDN_MULTILAYER": 1,
-  "CTS_TARGET_SKEW": 35
+  "CTS_TARGET_SKEW": 35,
+  "// scope": "This is a FLAT, all-14-blocks-included smoke run of sonic_top at the smallest parameter point every SYNTH_PARAMETERS knob supports -- N_TILES=1 (not the shipping 4), T=8 (not 64), ROUTER_LANES=4/SEGS=8 (the exact recipe that finished the standalone sonic_router run, see ../router/config.json and p4/RESULTS.md), CONV_CH=4, LMHEAD_K=4, SEQ_DEPTH=32, N_SRAM_BANKS=1, SRAM_AW=6 (64 words/bank). HANDOFF.md's T4.2 is explicit that the shipping-scale chip (TILE=64, 4 tiles, full 32-expert/64-lane router, 16x512KB SRAM) will NOT go through a flat LibreLane run -- the real path is hierarchical (harden tile/router/sram_bank once each, instance as macros via MACROS+MACRO_PLACEMENT_CFG). This config's only goal is to prove the FULL RTL HIERARCHY -- all 18 files, all 12 real digital blocks sonic_top instantiates -- makes it through synthesis-to-GDS as one netlist at all, the same 'flow-qualification, reduced scale' posture already proven for sonic_router (225k cells, 4h40m, clean DRC/LVS/antenna) and sonic_tile/sonic_sram_bank (T4.1 in HANDOFF.md). Do not quote any timing/power/area number from this run as a shipping-scale or 14nm claim.",
+  "// phy": "sonic_phy_lpddr5x.sv is included in VERILOG_FILES (it's part of the design) but sonic_top.sv does not instantiate it -- this is intentional, not a wiring gap. It models a commercial hardened LPDDR5X PHY macro (DFI 5.0), which in a real chip never goes through digital std-cell synthesis; it is dropped in as a hardened macro at the very top, outside this flow, same reason sonic_ioring's PLL is a behavioral stub rather than synthesized analog. p4/README.md's caveat #3 already says there is no open Sky130 LPDDR5X PHY to instantiate here. Leaving the file in VERILOG_FILES is harmless (Yosys will just not elaborate an uninstantiated module) and keeps this config's file list matching sonic_top.sv's header comment 1:1 for anyone diffing the two.",
+  "// clock": "1500 ns reuses the router's own proven-working number verbatim (p4/RESULTS.md: WNS/TNS=0, DRC/LVS/antenna clean at LANES=4/SEGS=8/1500ns) rather than guessing tighter for a first combined run neither this repo nor LibreLane has attempted before. sonic_tile (T4.1) and sonic_sram_bank both closed cleanly at 1000ns standalone, so 1500 should be conservative headroom for the union. Tighten after this run reports real post-CTS slack, exactly as router's config-next.json (800ns) tightened after the segs8 run measured 567ns worst path.",
+  "// util": "35%/40% is BELOW every existing block config (router 40/45, tile 65/68, sram/seq 45) on purpose: this is the first-ever combination of all 12 blocks in one netlist, so the resulting cell mix and congestion hot spots (top-k network + weight plane + descriptor ring all in one flat design) are unmeasured. HANDOFF.md's T4.1 log shows BOTH tile and sram_bank failed global placement (GPL-0301) or detailed placement post-CTS (DPL-0036) on their first two attempts before landing on ~40-45% -- start lower here, tighten only after a clean run establishes real headroom.",
+  "// macros": "No MACROS / MACRO_PLACEMENT_CFG key here on purpose. There are no hardened macros in this run -- SRAM banks and the router's PWL table synthesize to flip-flops (Finding 25 in p2/README.md), same as every other block run so far. The macro_placement.cfg file in this directory is a sketch for the FUTURE hierarchical T4.2 run (pre-hardened tile/router/sram_bank instanced as real macros) and does not match this flat run's instance names -- do not point MACRO_PLACEMENT_CFG at it here, it will fail to resolve instances.",
+  "// keys": "LibreLane errors on unrecognised config keys. Only keys beginning with // are exempt, which is why the comments look like this."
 }

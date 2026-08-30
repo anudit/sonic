@@ -1,0 +1,23 @@
+{
+  "DESIGN_NAME": "sonic_seq",
+  "VERILOG_FILES": [
+    "dir::../../../p2/rtl/sonic_seq.sv"
+  ],
+  "VERILOG_INCLUDE_DIRS": [
+    "dir::../../../p2/rtl"
+  ],
+  "SYNTH_PARAMETERS": [
+    "DEPTH=64"
+  ],
+  "// depth": "DEPTH=64 rather than the shipping 512: same reasoning as TILE=8 for the tile and LANES=4 for the router -- same structure (a DW=64 synchronous-read ring), 1/8 the words, tractable P&R. Unlike sram8 (T3.3, still flops-only), this run exists specifically to check whether the ring's registered-read restructuring (see p2/rtl/sonic_seq.sv comment above `pc_next`) lets this flow's synthesis map the ring onto a real sky130_sram_* macro instead of flops+mux -- that comparison is the point of this config.",
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 1000.0,
+  "CLOCK_NET": "clk",
+  "FP_SIZING": "absolute",
+  "DIE_AREA": "0 0 400 400",
+  "CORE_AREA": "10 10 390 390",
+  "PL_TARGET_DENSITY": 0.45,
+  "// util": "0.45 mirrors sram/router's margin, not tile's 0.68 -- learned the hard way from the sram8 DPL-0036 failure: initial placement density has to leave real headroom for what CTS and the hold/timing resizer add afterward, not just fit the synthesized cell count.",
+  "DESIGN_IS_CORE": 0,
+  "// keys": "LibreLane errors on unrecognised config keys. Only keys beginning with // are exempt."
+}

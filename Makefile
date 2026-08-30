@@ -1,4 +1,4 @@
-.PHONY: demo-data p3-top p3-layer p3-generate p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-tile p4-sram p4-router-ci p4-pull vectors iv wave numbers clean
+.PHONY: demo-data p3-top p3-layer p3-generate p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-tile p4-sram p4-seq p4-top p4-router-ci p4-pull vectors iv wave numbers clean
 
 # Homebrew's binutils shadows Apple's ar with GNU ar, whose archives macOS ld
 # rejects. Verilator links fail without this.
@@ -93,6 +93,12 @@ p2-units: build/sonic_golden.o
 	  p2/rtl/sonic_vec.sv p2/tb/tb_vec.cpp >/dev/null 2>&1
 	@$(MAKE) -C build/obj_vec -f Vsonic_vec.mk $(AR_FIX) -j8 >/dev/null 2>&1
 	@printf "  sonic_%-8s " "vec"; ./build/obj_vec/Vsonic_vec | tail -1
+	@rm -rf build/obj_sram_gate
+	@verilator --cc --exe -O2 -Wall -Wno-DECLFILENAME -Ip2/rtl -CFLAGS "-O2" \
+	  --Mdir build/obj_sram_gate --top-module sonic_sram_gate \
+	  p2/rtl/sonic_sram_gate.sv p2/tb/tb_sram_gate.cpp >/dev/null 2>&1
+	@$(MAKE) -C build/obj_sram_gate -f Vsonic_sram_gate.mk $(AR_FIX) -j8 >/dev/null 2>&1
+	@printf "  sonic_%-8s " "sram_gate"; ./build/obj_sram_gate/Vsonic_sram_gate | tail -1
 
 # Router RTL driven by REAL tensors from the 8.47B checkpoint.
 p2-router: p2/vectors/router_l5.bin
@@ -167,6 +173,21 @@ p4-tile:
 p4-sram:
 	@command -v nix >/dev/null || { echo "Nix not installed -- see p4/README.md"; exit 1; }
 	@cd p4/openlane/sram && nix run github:librelane/librelane -- config.json
+
+p4-seq:
+	@command -v nix >/dev/null || { echo "Nix not installed -- see p4/README.md"; exit 1; }
+	@cd p4/openlane/seq && nix run github:librelane/librelane -- config.json
+
+# Full-chip flat smoke run: all 18 RTL files, every SYNTH_PARAMETERS knob at
+# its smallest tractable value (see p4/openlane/top/config.json's own "//
+# scope" comment). This is NOT the shipping-scale chip -- see p4/HANDOFF.md
+# T4.2 -- it proves the full hierarchy synthesizes-to-GDS as one netlist.
+# Multi-hour, x86-64 Linux + Nix only (see p4/README.md).
+p4-top:
+	@command -v nix >/dev/null || { echo "Nix not installed -- see p4/README.md"; exit 1; }
+	@cd p4/openlane/top && nix run github:librelane/librelane -- config.json
+	@echo "opening the routed layout in KLayout"
+	@open -a KLayout $$(ls -td p4/openlane/top/runs/*/final/gds/*.gds | head -1)
 
 # CI path: no Nix on this machine. Runs on an x86-64 Linux runner, which is
 # where OpenROAD actually has support. LANES/PWL override the config defaults.
@@ -280,7 +301,7 @@ p3-top: p2/vectors/layer_l5.bin p2/vectors/multi/manifest.json build/sonic_golde
 	  p2/rtl/sonic_conv.sv p2/rtl/sonic_softmax.sv p2/rtl/sonic_lmhead.sv \
 	  p2/rtl/sonic_streamer.sv p2/rtl/sonic_router.sv p2/rtl/sonic_tile.sv \
 	  p2/rtl/sonic_seq.sv p2/rtl/sonic_vec.sv p2/rtl/sonic_sram_bank.sv \
-	  p2/rtl/sonic_sram.sv p2/rtl/sonic_rv32.sv p2/rtl/sonic_noc.sv \
+	  p2/rtl/sonic_sram_gate.sv p2/rtl/sonic_sram.sv p2/rtl/sonic_rv32.sv p2/rtl/sonic_noc.sv \
 	  p2/rtl/sonic_mbist.sv p2/rtl/sonic_phy_lpddr5x.sv p2/rtl/sonic_ioring.sv \
 	  p2/rtl/sonic_top.sv p2/tb/tb_top.cpp $(CURDIR)/build/sonic_golden.o >/dev/null 2>&1
 	@$(MAKE) -C build/obj_top -f Vsonic_top.mk $(AR_FIX) -j8 >/dev/null 2>&1

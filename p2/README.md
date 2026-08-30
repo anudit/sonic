@@ -474,6 +474,52 @@ All three rewrites are **100% numerically transparent** (`make golden`, `make te
 `make p2-router` (top-4 0.9961), `make p3-dense` (0.99363), `make p3-layer` (0.99119),
 and `make p3-top` (0.99119)).
 
+## Finding 25: `sonic_seq`'s ring wasn't the reduction-tree bug it looked like, and `sonic_softmax`'s 132 levels isn't a tree at all
+
+A post-router-run pass over PPA and power/size/speed follow-ups surfaced two
+mismatches between what the numbers looked like and what the RTL actually is.
+
+- **`sonic_softmax` has no reduction chain to rebalance.** Unlike `sonic_acc`,
+  `sonic_conv` and `sonic_router` (Finding 24), it is a single-sample-per-cycle
+  online recurrence: one `mulq16` (32x32→64 Q16 multiply) feeding one
+  accumulate, once per cycle. Its 132 levels is the combinational depth of
+  that one multiply-accumulate, gated by the `score > m_q` comparator ahead of
+  it -- not a serial fold across N lanes. The real lever is pipelining the MAC
+  itself, which is a materially riskier change here: `m_q`/`corr`/`wgt` feed
+  back into the *same* cycle's computation, so naively registering the
+  multiply breaks the online-softmax recurrence (the same family of bug as
+  Finding 17) and needs a deliberate redesign plus a new differential check,
+  not a mechanical rewrite. Left undone, on purpose, pending that.
+- **`sonic_seq`'s outsized cell count was a memory-inference gap, not a
+  clock-gating gap.** `p2/ppa/out/ppa.json`'s `area` field is actually a sum
+  of `$_DFF` cell instances (mislabeled) -- 32,849 for `sonic_seq`, which is
+  32,768 (the 512x64 descriptor ring) plus ~80 control/FSM bits. The ring was
+  declared as a plain array with a **combinational** read (`ring[pc]`) feeding
+  a mux before ever reaching a register -- a pattern most memory-inference and
+  SRAM-macro-mapping passes don't recognize, so it flattened to a flip-flop
+  array plus a large address-decode/read-mux instead of mapping to an SRAM.
+  Fixed by registering the read directly (`raw_q <= ring[pc_next]`, with
+  `pc_next` computed one cycle ahead to land on the exact same cycle the old
+  combinational read did -- a synthesis-mapping change only, verified
+  bit-identical against `tb_seq.cpp`, 367/367 checks, and `make test` 40/40).
+  This doesn't move the needle in `p2/ppa`'s generic `abc -g cmos2` flow --
+  that flow has no SRAM macro library at all, so it flattens any array to
+  flops regardless of RTL style -- the payoff is at a real P4 Sky130 run,
+  which now has a config (`p4/openlane/seq/config.json`, `make p4-seq`) but
+  hasn't been executed yet.
+- **SRAM bank power-gating was fully unwired, not partially extended.**
+  `sonic_sram_bank.sv` has always supported per-bank retention sleep, but
+  `sonic_top.sv` tied `sonic_sram`'s `bank_sleep` input to `'0` -- every one of
+  the 16 512 KB banks stayed awake unconditionally. No code in this repo
+  implements or measures any existing bank-level gating. Fixed with a new
+  `sonic_sram_gate` (per-bank idle counter, sleep after 256 idle cycles,
+  `bank_ce` forces sleep low combinationally the same cycle so a real access
+  is never dropped -- see its own header comment for the safety argument),
+  wired into `sonic_top` in place of the tie-off. Verified in isolation
+  (`tb_sram_gate.cpp`, 261/261 checks: no premature sleep, sleep exactly at
+  the idle threshold, glitch-free wake, bank independence) and functionally
+  unchanged end-to-end (`make p3-top`).
+
 ## Caveats
 
 - Depth and cell counts come from `abc -g cmos2` against a **generic** library
