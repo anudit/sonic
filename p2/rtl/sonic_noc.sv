@@ -49,9 +49,9 @@ module sonic_noc #(
   // Address decoding (top bits select slave): 0x0.. tiles, 0x1.. SRAM,
   // 0x2.. vector unit, 0x3.. LM head. Same map every master uses.
   localparam int SEL_W = $clog2(N_SLAVES);
-  function automatic logic [SEL_W-1:0] decode(input logic [ADDR_W-1:0] addr);
+  function logic [SEL_W-1:0] decode(input logic [ADDR_W-1:0] addr);
     /* verilator lint_off UNUSEDSIGNAL */
-    return addr[ADDR_W-1 -: SEL_W];
+    decode = addr[ADDR_W-1 -: SEL_W];
     /* verilator lint_on UNUSEDSIGNAL */
   endfunction
 
@@ -69,10 +69,19 @@ module sonic_noc #(
   always_comb begin
     for (int s = 0; s < N_SLAVES; s++) begin
       grant[s] = '0;
-      for (int off = 0; off < N_MASTERS; off++) begin
-        automatic int m = (int'(rr_ptr[s]) + off) % N_MASTERS;
-        if (grant[s] == '0 && m_req[m] && (m_target[m] == s[SEL_W-1:0]))
-          grant[s][m] = 1'b1;
+      // N_MASTERS==3 explicit priority rotation (no %, automatic, int', or s[SEL_W-1:0])
+      if (rr_ptr[s] == 0) begin
+        if (grant[s] == '0 && m_req[0] && (m_target[0] == SEL_W'(s))) grant[s][0] = 1'b1;
+        if (grant[s] == '0 && m_req[1] && (m_target[1] == SEL_W'(s))) grant[s][1] = 1'b1;
+        if (grant[s] == '0 && m_req[2] && (m_target[2] == SEL_W'(s))) grant[s][2] = 1'b1;
+      end else if (rr_ptr[s] == 1) begin
+        if (grant[s] == '0 && m_req[1] && (m_target[1] == SEL_W'(s))) grant[s][1] = 1'b1;
+        if (grant[s] == '0 && m_req[2] && (m_target[2] == SEL_W'(s))) grant[s][2] = 1'b1;
+        if (grant[s] == '0 && m_req[0] && (m_target[0] == SEL_W'(s))) grant[s][0] = 1'b1;
+      end else begin
+        if (grant[s] == '0 && m_req[2] && (m_target[2] == SEL_W'(s))) grant[s][2] = 1'b1;
+        if (grant[s] == '0 && m_req[0] && (m_target[0] == SEL_W'(s))) grant[s][0] = 1'b1;
+        if (grant[s] == '0 && m_req[1] && (m_target[1] == SEL_W'(s))) grant[s][1] = 1'b1;
       end
     end
   end
@@ -105,8 +114,11 @@ module sonic_noc #(
     end else begin
       for (int s = 0; s < N_SLAVES; s++) begin
         for (int m = 0; m < N_MASTERS; m++) begin
-          if (grant[s][m] && s_ack[s])
-            rr_ptr[s] <= $clog2(N_MASTERS)'((m + 1) % N_MASTERS);
+          if (grant[s][m] && s_ack[s]) begin
+            if (m == 0) rr_ptr[s] <= 1;
+            else if (m == 1) rr_ptr[s] <= 2;
+            else rr_ptr[s] <= 0;
+          end
         end
       end
     end

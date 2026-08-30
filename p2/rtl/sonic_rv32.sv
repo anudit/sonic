@@ -176,7 +176,7 @@ module sonic_rv32 #(
       default:           wb_data = 32'b0;
     endcase
   end
-  wire rd_writes = (opcode inside {OP_LUI, OP_AUIPC, OP_JAL, OP_JALR, OP_LOAD, OP_IMM, OP_REG}) && (rd != 5'd0);
+  wire rd_writes = ((opcode==OP_LUI)||(opcode==OP_AUIPC)||(opcode==OP_JAL)||(opcode==OP_JALR)||(opcode==OP_LOAD)||(opcode==OP_IMM)||(opcode==OP_REG)) && (rd != 5'd0);
 
   wire [31:0] next_pc_seq  = pc + 32'd4;
   wire [31:0] next_pc_jal  = pc + imm_j;
