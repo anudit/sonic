@@ -10,7 +10,10 @@ interval spans the thing it is supposed to prove is *not a measurement*.
 
 Tree state at handoff: `make test` 40/40 · `make golden` 0 failures ·
 `make p2` exit 0, all nine units · `make p3-dense` cosine 0.99363 ·
-`make p3-layer` cosine 0.99119 · `make p2-router` top-4 0.9961.
+`make p3-layer` cosine 0.99119 · `make p2-router` top-4 0.9961 · `make p3-top`
+cosine 0.99119 · flat `sonic_top` LibreLane run on Sky130 (run
+`RUN_2026-08-30_14-42-29`): DRC/LVS clean, setup WNS/TNS 0/0, **hold WNS
+-0.0306 ns (2 violations, new)**, **7 antenna violations open** — see T4.2.
 
 ---
 
@@ -292,15 +295,22 @@ max-cap. The clock net has 1,586 terminals.
 
 This is the actual gap to "end to end". Everything above is remediation.
 
-**T3.1 — `sonic_top.sv`.** There is no top level. `sonic_tile` is one 64×64
-sub-tile; nothing instantiates `N_TILES` of them with the router, streamer, acc,
-softmax, lmhead and seq. `make p3-dense` and `p3-ring` drive units individually.
-- *Do:* assemble the datapath, driven by `sonic_seq` from the producer ring
-  (already validated at 301 descriptors).
-- *Accept:* one full transformer layer through the assembled top, against
-  `sonic_golden`, at **cosine ≥ 0.99** — matching what the units already achieve
-  individually (0.99363 dense, 0.99119 MoE). A new `make p3-top` target, green.
-- *This is the first milestone that earns the phrase "end to end."*
+**T3.1 — `sonic_top.sv`. [x] Done, at both the RTL and the physical-design level.**
+`p2/rtl/sonic_top.sv` now instantiates all 12 digital blocks (sequencer, weight
+streamer, MoE router, systolic tile(s), short-conv, online-softmax, LM head,
+vector unit, SRAM + gating + MBIST, RV32 controller, NoC, I/O ring); `make
+p3-top` drives one full transformer layer through it against `sonic_golden` at
+**cosine 0.99119**, matching the MoE-layer figure the units already hit
+individually. That satisfies this item's original accept criteria.
+
+Beyond that, the full 18-file hierarchy has now also been taken through a real
+**flat LibreLane synthesis-to-GDS run** on Sky130 (`p4/openlane/top/config.json`,
+run `RUN_2026-08-30_14-42-29`, `final/` present, metrics copied to
+`p4/openlane/top/results/top1/`). This is a flow-qualification smoke test, not
+a shipping-scale result — see the caveat under T4.2 below for the numbers and
+what they do and do not mean.
+- *This is the first milestone that earns the phrase "end to end," now true at
+  both the simulation and the physical-design layer.*
 
 **T3.2 — Multi-layer, then multi-token, through `sonic_top`.**
 - *Accept:* ≥ 4 consecutive layers and ≥ 8 decode tokens, cosine ≥ 0.99 at every
@@ -385,8 +395,84 @@ timing-critical block and now the only large one whose depth is understood.
   see `p4/render_gds.py` / `p4/render_gds_crop.py`.
 
 **T4.2 — Hierarchical P&R.** A 16,384-MAC chip will not go through a flat
-LibreLane run — the router alone was 225 k cells and 4 h 40 min. Tile hardened
-once and instanced 4×, router hardened, top-level assembly.
+LibreLane run at shipping scale — the router alone was 225 k cells and 4 h 40
+min. Tile hardened once and instanced 4×, router hardened, top-level assembly.
+Still not done — but the flow-qualification step below is now measured.
+
+**Flat qualification run of the full `sonic_top` hierarchy — done, real GDS.**
+Per `p4/openlane/top/HANDOFF_TOP_RUN.md`'s recipe, at the smallest tractable
+value of every size knob (`T=8`, `N_TILES=1`, `ROUTER_LANES=4`,
+`ROUTER_PWL_SEGS=8`/`RANGE=4`, `CONV_CH=4`, `LMHEAD_K=4`, `SEQ_DEPTH=32`,
+`N_SRAM_BANKS=1`, `SRAM_AW=6`, `CLOCK_PERIOD=1500` reused verbatim from the
+router run):
+
+| Metric | Value |
+|---|---:|
+| Die area | 12.19 mm² (3485.7 × 3496.4 µm) |
+| Core utilisation | 50.35% |
+| Std cells | 1,045,383 (+ 1,772,774 fill, 172,025 tap, 354,678 antenna) |
+| Setup WNS/TNS, all corners | 0 / 0 |
+| **Hold WNS/TNS, worst corner** | **-0.0306 ns / -0.0365 ns, 2 violations** |
+| Total power | 97.4 mW (56.9 switching, 40.5 internal, 0.011 leakage) |
+| Magic DRC / KLayout DRC / LVS | 0 / 0 / 0 |
+| GDS XOR (Magic vs KLayout) | 0 |
+| **Antenna violations** | **7 nets / 7 pins, after 279 diodes inserted** |
+| Routing DRC | 0 (converged over 32 iterations) |
+| Static IR drop (OpenROAD default check) | 0.668 mV worst (0.037% of 1.8 V) |
+
+Same clean-headline-hides-real-violations pattern as every other block run:
+**max-slew 241,809, max-fanout 30,354 (corner-invariant, structural), max-cap
+4,164** at the worst corner (`max_ss_100C_1v60`) — an order of magnitude worse
+than the router alone, as expected from unioning 12 blocks' worth of nets.
+
+Two things are genuinely new here, not just "bigger version of the router
+result":
+1. **Hold is not clean.** Every prior block run (router, tile, sram) closed at
+   WNS/TNS=0 on *both* setup and hold. This run has 2 hold violations at
+   -0.0306 ns TNS. Small, but it is the first block-level regression of that
+   kind and has not been root-caused.
+2. **Antenna is not fully clean.** The router closed 503 → 0 violations with 29
+   diodes. This run inserted 279 diodes and still has 7 violations open.
+
+Do not quote timing, power, or area from this run as a shipping-scale or 14 nm
+number — see `p4/openlane/top/HANDOFF_TOP_RUN.md` for why (Sky130, every knob
+shrunk, `CLOCK_PERIOD` chosen to let the flow reach routing, not as a frequency
+target). Its value, like the router's, is as a flow-qualification baseline: it
+proves the full 18-file, 12-block RTL hierarchy makes it through synthesis,
+floorplan, place, CTS, route, and DRC/LVS/antenna signoff as one netlist.
+**Accept criteria for this sub-item:** hold violations resolved and antenna
+fully clean, then this becomes the baseline the real hierarchical run (T4.2
+proper) is diffed against.
+
+The full-die GDS was rendered (KLayout, real Sky130 layer colors and
+properties, `areaid`/`fill`/`tap`/`boundary` marker layers hidden so the image
+is actual routed metal rather than solid marker fill or fill-cell moiré) at
+`p4/openlane/top/results/top1/sonic_top.jpg`. It shows real structure — the
+horizontal power-strap rows and the vertical block-to-block density seams
+between the 12 instantiated units are visible directly in the metal — not a
+mockup.
+
+A labeled version, `sonic_top_blocks.jpg`, draws each unit's approximate
+footprint. **Caveat that matters more than the picture:** the DEF is fully
+flattened — no cell retains a hierarchical instance name — so per-unit extents
+were recovered indirectly, by parsing `NETS` for signals whose names still
+carry the pre-flatten hierarchy path (e.g. `g_tiles\[0\].u_tile.bank_s1\[0\]`,
+8,486 such nets out of ~524k) or a unit's own top-level port aliases where
+internal names didn't survive, then taking the 5th–95th percentile placement
+box of every physical cell touching those nets. Most units localize into a
+small, sane region this way (`u_sram_gate` in 0.005% of the die, `u_lmhead` in
+0.05%, `u_conv` in 1.8%). Two do not, and that's a real finding, not a parsing
+bug: **`u_router` spans ~53% of the die area and `u_vec`'s operand nets span
+~98%** — in a flat, unconstrained placement nothing forces a module's cells to
+stay physically together, and evidently the placer scattered these two across
+most of the floorplan chasing wirelength. `u_vec`'s box is omitted from the
+image for exactly that reason (it isn't a region). **`u_noc` and `u_ioring`
+have zero matching nets — zero surviving synthesized logic in this run** —
+every `u_ioring` output is left unconnected in `sonic_top.sv` and `u_noc`'s
+only consumer is `u_rv32`'s otherwise-unobserved NoC port, so synthesis
+dead-code-eliminated both almost entirely. Confirms this flat run does not
+exercise NoC/RV32 end-to-end, consistent with `ROADMAP.md`'s own note that
+"NoC and RV32 core... aren't yet driven end-to-end through `sonic_top`."
 
 **T4.3 — Commercial flow on the real PDK.** This is the plan's actual P4.
 Sky130 at 1.76 MHz is 1,700× from the 1 GHz target; that gap is process, not
