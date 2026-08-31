@@ -397,7 +397,26 @@ timing-critical block and now the only large one whose depth is understood.
 **T4.2 — Hierarchical P&R.** A 16,384-MAC chip will not go through a flat
 LibreLane run at shipping scale — the router alone was 225 k cells and 4 h 40
 min. Tile hardened once and instanced 4×, router hardened, top-level assembly.
-Still not done — but the flow-qualification step below is now measured.
+Still not run — but the flow-qualification step below is now measured, and
+the hierarchical config itself is now written: `p4/openlane/top-hier/`
+(`config.json` + `macro_placement.cfg` + `HANDOFF_TOP_HIER.md`), replacing
+the old shipping-scale `macro_placement.cfg` sketch (wrong instance names —
+`u_tile_0..3` doesn't exist in `sonic_top.sv`; wrong scale — a 4534x4534um
+"14nm" die built around full T=64/LANES=64/16-bank SRAM, none of which is
+buildable on Sky130). The new config instances `sonic_tile` (T=8),
+`sonic_router` (LANES=4/SEGS=8) and `sonic_sram_bank` (ADDR_WIDTH=8) as
+macros at their real generate-block instance paths
+(`g_tiles[i].u_tile`, `u_router`, `u_sram.g_sram_banks[b].u_bank`) on a
+real Sky130-scale floorplan (5150 x 4300 um), at `N_TILES=4`/`N_SRAM_BANKS=4`
+— a genuine step up from the flat run's `N_TILES=1`/`N_SRAM_BANKS=1`,
+affordable specifically because macro instancing skips re-running ABC on
+each block's internals. **It cannot run yet**: none of the three block runs
+vendored GDS/LEF/blackbox-netlist artifacts in this repo (only
+`metrics.json`/`.lib` were kept, per this repo's own "don't commit the GDS"
+convention), and `sonic_router`'s `results/segs8/` has no `.lib` at any
+corner at all (tile and sram both do) — so router re-runs without a timing
+model once dropped in as a macro. `HANDOFF_TOP_HIER.md` has the exact
+re-run-and-copy steps needed before a first hierarchical attempt.
 
 **Flat qualification run of the full `sonic_top` hierarchy — done, real GDS.**
 Per `p4/openlane/top/HANDOFF_TOP_RUN.md`'s recipe, at the smallest tractable

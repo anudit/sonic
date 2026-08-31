@@ -1,0 +1,104 @@
+{
+  "DESIGN_NAME": "sonic_top",
+  "VERILOG_FILES": [
+    "dir::../../../p2/rtl/sonic_streamer.sv",
+    "dir::../../../p2/rtl/sonic_conv.sv",
+    "dir::../../../p2/rtl/sonic_softmax.sv",
+    "dir::../../../p2/rtl/sonic_lmhead.sv",
+    "dir::../../../p2/rtl/sonic_seq.sv",
+    "dir::../../../p2/rtl/sonic_vec.sv",
+    "dir::../../../p2/rtl/sonic_sram_gate.sv",
+    "dir::../../../p2/rtl/sonic_sram.sv",
+    "dir::../../../p2/rtl/sonic_rv32.sv",
+    "dir::../../../p2/rtl/sonic_noc.sv",
+    "dir::../../../p2/rtl/sonic_mbist.sv",
+    "dir::../../../p2/rtl/sonic_phy_lpddr5x.sv",
+    "dir::../../../p2/rtl/sonic_ioring.sv",
+    "dir::../../../p2/rtl/sonic_top.sv"
+  ],
+  "VERILOG_INCLUDE_DIRS": [
+    "dir::../../../p2/rtl"
+  ],
+  "SYNTH_PARAMETERS": [
+    "T=8",
+    "N_TILES=4",
+    "ROUTER_LANES=4",
+    "ROUTER_PWL_SEGS=8",
+    "ROUTER_PWL_RANGE=4",
+    "CONV_CH=4",
+    "LMHEAD_K=4",
+    "SEQ_DEPTH=32",
+    "N_SRAM_BANKS=4",
+    "SRAM_AW=8"
+  ],
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 1500,
+  "FP_SIZING": "absolute",
+  "DIE_AREA": "0 0 5150 4300",
+  "CORE_AREA": "50 50 5100 4250",
+  "PL_TARGET_DENSITY_PCT": 40,
+  "RUN_HEURISTIC_DIODE_INSERTION": true,
+  "GRT_ALLOW_CONGESTION": true,
+  "SYNTH_STRATEGY": "AREA 0",
+  "SYNTH_BUFFERING": 1,
+  "SYNTH_SIZING": 1,
+  "GLB_RT_MAX_DIODE_INS_ITERS": 5,
+  "DESIGN_IS_CORE": 1,
+  "FP_PDN_MULTILAYER": 1,
+  "CTS_TARGET_SKEW": 35,
+  "MACROS": {
+    "sonic_tile": {
+      "gds": ["dir::../tile/results/tile8/gds/sonic_tile.gds"],
+      "lef": ["dir::../tile/results/tile8/lef/sonic_tile.lef"],
+      "nl": ["dir::../tile/results/tile8/nl/sonic_tile.nl.v"],
+      "lib": {
+        "nom_tt_025C_1v80": "dir::../tile/results/tile8/lib/nom_tt_025C_1v80/sonic_tile__nom_tt_025C_1v80.lib",
+        "max_ss_100C_1v60": "dir::../tile/results/tile8/lib/max_ss_100C_1v60/sonic_tile__max_ss_100C_1v60.lib",
+        "min_ff_n40C_1v95": "dir::../tile/results/tile8/lib/min_ff_n40C_1v95/sonic_tile__min_ff_n40C_1v95.lib"
+      },
+      "instances": {
+        "g_tiles[0].u_tile": {"location": [200, 200], "orientation": "N"},
+        "g_tiles[1].u_tile": {"location": [1650, 200], "orientation": "N"},
+        "g_tiles[2].u_tile": {"location": [200, 1650], "orientation": "N"},
+        "g_tiles[3].u_tile": {"location": [1650, 1650], "orientation": "N"}
+      }
+    },
+    "sonic_router": {
+      "gds": ["dir::../router/results/segs8/gds/sonic_router.gds"],
+      "lef": ["dir::../router/results/segs8/lef/sonic_router.lef"],
+      "nl": ["dir::../router/results/segs8/nl/sonic_router.nl.v"],
+      "lib": {
+        "nom_tt_025C_1v80": "dir::../router/results/segs8/lib/nom_tt_025C_1v80/sonic_router__nom_tt_025C_1v80.lib",
+        "max_ss_100C_1v60": "dir::../router/results/segs8/lib/max_ss_100C_1v60/sonic_router__max_ss_100C_1v60.lib",
+        "min_ff_n40C_1v95": "dir::../router/results/segs8/lib/min_ff_n40C_1v95/sonic_router__min_ff_n40C_1v95.lib"
+      },
+      "instances": {
+        "u_router": {"location": [3100, 200], "orientation": "N"}
+      }
+    },
+    "sonic_sram_bank": {
+      "gds": ["dir::../sram/results/sram8/gds/sonic_sram_bank.gds"],
+      "lef": ["dir::../sram/results/sram8/lef/sonic_sram_bank.lef"],
+      "nl": ["dir::../sram/results/sram8/nl/sonic_sram_bank.nl.v"],
+      "lib": {
+        "nom_tt_025C_1v80": "dir::../sram/results/sram8/lib/nom_tt_025C_1v80/sonic_sram_bank__nom_tt_025C_1v80.lib",
+        "max_ss_100C_1v60": "dir::../sram/results/sram8/lib/max_ss_100C_1v60/sonic_sram_bank__max_ss_100C_1v60.lib",
+        "min_ff_n40C_1v95": "dir::../sram/results/sram8/lib/min_ff_n40C_1v95/sonic_sram_bank__min_ff_n40C_1v95.lib"
+      },
+      "instances": {
+        "u_sram.g_sram_banks[0].u_bank": {"location": [200, 3100], "orientation": "N"},
+        "u_sram.g_sram_banks[1].u_bank": {"location": [1450, 3100], "orientation": "N"},
+        "u_sram.g_sram_banks[2].u_bank": {"location": [2700, 3100], "orientation": "N"},
+        "u_sram.g_sram_banks[3].u_bank": {"location": [3950, 3100], "orientation": "N"}
+      }
+    }
+  },
+  "// scope": "Hierarchical assembly (HANDOFF.md T4.2), not a flat run: sonic_tile/sonic_router/sonic_sram_bank are consumed as pre-hardened macros (GDS+LEF+LIB+blackbox netlist from their own p4/openlane/{tile,router,sram} block runs) and instanced via MACROS, not re-synthesized here. This is why N_TILES=4 and N_SRAM_BANKS=4 are now affordable when the flat p4/openlane/top/config.json had to pin both to 1 -- macro instancing doesn't re-run ABC on tile/router/sram_bank's internals, it just places+routes finished blocks plus the (much smaller) glue logic (seq/streamer/conv/softmax/lmhead/vec/sram_gate/mbist/rv32/noc/ioring) that VERILOG_FILES still lists. T=8/LANES=4/SEGS=8/ADDR_WIDTH=8 are NOT independent choices here -- they must match whatever the tile/router/sram block runs actually hardened, because a macro's internal parameterization is baked into its GDS/LEF and cannot be changed at the top level.",
+  "// prereqs": "This config will not run yet. Three artifact classes referenced under MACROS do not exist in this repo today and must be produced before `nix run github:librelane/librelane -- config.json` here can succeed: (1) GDS -- none of the three block runs vendor their GDS in this repo (deliberately, per HANDOFF_TOP_RUN.md's own convention -- 113MB+ each); pull it from wherever the original run's runs/<tag>/final/gds/ landed, or re-run p4-tile/p4-router/p4-sram and keep the GDS this time. (2) LEF -- same story, needed from final/lef/ of those same runs; LibreLane's own flow with MACROS declared always emits LEF+GDS+lib+nl for that run so a *future* p4-tile/p4-router/p4-sram invocation should already produce everything needed as long as its config.json isn't changed (T=8/LANES=4/SEGS=8/ADDR_WIDTH=8 stay as-is). (3) sonic_router has NO committed .lib at any corner (only tile and sram do -- compare p4/openlane/{tile,sram}/results/*/lib/ against router/results/segs8/, which has none). Without a router .lib, top-level STA cannot time paths through the router macro at all; re-run p4-router (unchanged config) and this time copy runs/<tag>/final/lib/ into router/results/segs8/lib/, mirroring the tile/sram layout exactly (paths above assume that layout).",
+  "// counts": "N_TILES=4 and N_SRAM_BANKS=4 are a first hierarchical step, not the shipping counts (4 is already the shipping tile count; SRAM is 4 of the shipping 16 banks). Going from 1 to multiple instances of an *already-hardened* macro is the actual thing this run needs to prove that the flat run (N_TILES=1, N_SRAM_BANKS=1) could not -- multi-macro placement, routing between macro halos, and PDN reaching across them. Raising N_SRAM_BANKS to the shipping 16 is an easy follow-on once this floorplan closes (add rows to the MACROS.sonic_sram_bank.instances object and widen DIE_AREA), same idea as router's config-next.json tightening after config.json's segs8 baseline. Do not raise it before a first hierarchical run establishes a baseline, per the same lesson every block run in this repo already learned about tightening parameters before a first pass exists.",
+  "// floorplan": "DIE_AREA/CORE_AREA and every MACROS.*.instances location are derived in p4/openlane/top-hier/macro_placement.cfg (kept as a human-readable cross-check, not consumed by the flow -- this config.json is the single source of truth LibreLane actually reads). Update both files together.",
+  "// glue": "The un-hardened blocks (seq/streamer/conv/softmax/lmhead/vec/sram_gate/mbist/rv32/noc/ioring) still synthesize as flat std-cell logic in VERILOG_FILES, same as the flat top run -- this hierarchical config only pulls tile/router/sram_bank out of that set because those are the only three blocks with a finished, independently-hardened result to instance as a macro (HANDOFF.md T4.1). sonic_acc.sv/sonic_pe.sv are intentionally absent from VERILOG_FILES here -- they're internal to sonic_tile and are already compiled into the tile macro, listing them again would double-declare those modules against the macro's blackbox view.",
+  "// phy": "sonic_phy_lpddr5x.sv is listed but not instantiated by sonic_top.sv, same as the flat run's config.json -- see that file's own \"// phy\" comment for why (hardened commercial macro dropped in outside this flow, not synthesizable on Sky130).",
+  "// clock": "1500 ns reused verbatim from the flat top/router runs -- this is a flow-qualification clock (lets the resizer finish and the flow reach routing), not a frequency claim; see p4/openlane/top/config.json's own \"// clock\" comment.",
+  "// keys": "LibreLane errors on unrecognised config keys. Only keys beginning with // are exempt, which is why the comments look like this."
+}

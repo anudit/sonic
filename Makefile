@@ -1,4 +1,4 @@
-.PHONY: demo-data p3-top p3-layer p3-generate p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-tile p4-sram p4-seq p4-top p4-router-ci p4-pull vectors iv wave numbers clean
+.PHONY: demo-data p3-top p3-layer p3-generate p2-conv all test golden p0 p0-gates p0-gates-uniform p0-accbound p1 p1-dram p2 p2-sweep p2-units p2-router p2-pwl-sweep p3 p4-router p4-tile p4-sram p4-seq p4-top p4-top-hier p4-router-ci p4-pull vectors iv wave numbers clean
 
 # Homebrew's binutils shadows Apple's ar with GNU ar, whose archives macOS ld
 # rejects. Verilator links fail without this.
@@ -188,6 +188,16 @@ p4-top:
 	@cd p4/openlane/top && nix run github:librelane/librelane -- config.json
 	@echo "opening the routed layout in KLayout"
 	@open -a KLayout $$(ls -td p4/openlane/top/runs/*/final/gds/*.gds | head -1)
+
+# Hierarchical assembly (HANDOFF.md T4.2): sonic_tile/sonic_router/
+# sonic_sram_bank consumed as pre-hardened macros via MACROS, not
+# re-synthesized -- see p4/openlane/top-hier/HANDOFF_TOP_HIER.md for the
+# prerequisite GDS/LEF/lib artifacts this needs before it will run at all.
+p4-top-hier:
+	@command -v nix >/dev/null || { echo "Nix not installed -- see p4/README.md"; exit 1; }
+	@cd p4/openlane/top-hier && nix run github:librelane/librelane -- config.json
+	@echo "opening the routed layout in KLayout"
+	@open -a KLayout $$(ls -td p4/openlane/top-hier/runs/*/final/gds/*.gds | head -1)
 
 # CI path: no Nix on this machine. Runs on an x86-64 Linux runner, which is
 # where OpenROAD actually has support. LANES/PWL override the config defaults.
